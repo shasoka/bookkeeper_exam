@@ -22,3 +22,11 @@ CREATE TABLE questions (
     correct_answer TEXT,
     FOREIGN KEY (theme_id) REFERENCES themes(id)
 );
+
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    telegram_id TEXT
+);
+
+INSERT INTO users (telegram_id) VALUES ('401791628');
+INSERT INTO users (telegram_id) VALUES ('760058245');

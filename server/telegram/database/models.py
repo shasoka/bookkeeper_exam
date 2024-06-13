@@ -39,3 +39,10 @@ class Question(Base):
     correct_answer: Mapped[str] = mapped_column(nullable=False)
 
     theme_id: Mapped[int] = mapped_column(ForeignKey("themes.id"))
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    telegram_id: Mapped[str] = mapped_column(nullable=False)
