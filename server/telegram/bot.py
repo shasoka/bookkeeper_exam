@@ -366,7 +366,6 @@ async def on_poll_answer(
             message_effect_id=random.choice(SUCCESS_EFFECT_IDS)
         )
     else:
-        # TODO не забыть про вопрос с 10+ ответами
         a_msg = await bot.send_message(
             user.telegram_id,
             '❌ ' + html.bold(random.choice(FAIL_STATUSES)) + '\n\n❕ ' + html.bold('Правильный ответ:') + ' ' + html.italic(correct_answer),
@@ -401,9 +400,6 @@ dp.callback_query.register(select_section_handler, lambda c: c.data.startswith('
 dp.callback_query.register(select_theme_handler, lambda c: c.data.startswith('theme'))
 dp.callback_query.register(answer_quiz_handler, lambda c: c.data.startswith('quiz'))
 dp.callback_query.register(delete_msg_handler, lambda c: c.data == 'delete')
-
-
-# TODO неправильные вопросы
 
 
 async def main() -> None:
