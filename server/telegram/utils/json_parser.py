@@ -19,7 +19,9 @@ DB_PASS = os.environ.get("DB_PASS")
 
 def connect():
     try:
-        with psycopg2.connect(user=DB_USER, password=DB_PASS, host=DB_HOST, port=DB_PORT, dbname=DB_NAME) as conn:
+        with psycopg2.connect(
+            user=DB_USER, password=DB_PASS, host=DB_HOST, port=DB_PORT, dbname=DB_NAME
+        ) as conn:
             return conn
     except (psycopg2.DatabaseError, Exception) as error:
         print(error)
@@ -73,11 +75,16 @@ def parse_questions(lines):
                 questions_dict[cur_section][line] = dict()
             if not is_toc(line):
                 cur_theme = get_full_theme(line, questions_dict[cur_section].keys())
-        if startswith_regex(line, r'^\d+\.'):
-            questions_dict[cur_section][cur_theme][line] = {'correct': '', 'variants': []}
+        if startswith_regex(line, r"^\d+\."):
+            questions_dict[cur_section][cur_theme][line] = {
+                "correct": "",
+                "variants": [],
+            }
             cur_question = line
-        if startswith_regex(line, r'^[а-я]\)'):
-            questions_dict[cur_section][cur_theme][cur_question]['variants'].append(line)
+        if startswith_regex(line, r"^[а-я]\)"):
+            questions_dict[cur_section][cur_theme][cur_question]["variants"].append(
+                line
+            )
     return questions_dict
 
 
@@ -88,10 +95,12 @@ def parse_answers(questions_dict: dict, answers_lines: list):
             cur_section = line
         if line.startswith("Тема"):
             cur_theme = line
-        if startswith_regex(line, r'^\d+\.'):
+        if startswith_regex(line, r"^\d+\."):
             for question in questions_dict[cur_section][cur_theme].keys():
-                if question.startswith(line[:line.index(".") + 1]):
-                    questions_dict[cur_section][cur_theme][question]['correct'] = line[line.index(".") + 2:].lower()
+                if question.startswith(line[: line.index(".") + 1]):
+                    questions_dict[cur_section][cur_theme][question]["correct"] = line[
+                        line.index(".") + 2 :
+                    ].lower()
 
     return questions_dict
 
@@ -111,7 +120,11 @@ def write_to_db(questions_dict: dict):
                     f"  )"
                 )
                 for question, answers in questions.items():
-                    variants = "{" + json.dumps(answers["variants"], ensure_ascii=False)[1:-1] + "}"
+                    variants = (
+                        "{"
+                        + json.dumps(answers["variants"], ensure_ascii=False)[1:-1]
+                        + "}"
+                    )
                     correct = answers["correct"]
                     cursor.execute(
                         f"INSERT INTO questions (theme_id, title, answers, correct_answer) VALUES"

@@ -1,15 +1,12 @@
 from typing import Any
 
-from sqlalchemy import ForeignKey, JSON, ARRAY, Column, Integer
+from sqlalchemy import ForeignKey, JSON, ARRAY, Integer
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.orm import mapped_column, Mapped
 
 
 class Base(DeclarativeBase):
-    type_annotation_map = {
-        dict[str, Any]: JSON,
-        list[int]: ARRAY(Integer)
-    }
+    type_annotation_map = {dict[str, Any]: JSON, list[int]: ARRAY(Integer)}
 
 
 class Section(Base):
@@ -49,7 +46,9 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[str] = mapped_column(nullable=False)
 
-    session: Mapped["UserSession"] = relationship("UserSession", back_populates="user", uselist=True)
+    session: Mapped["UserSession"] = relationship(
+        "UserSession", back_populates="user", uselist=True
+    )
 
 
 class UserSession(Base):

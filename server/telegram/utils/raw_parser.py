@@ -55,14 +55,19 @@ def parse_questions(lines):
                 questions_dict[cur_section][line] = dict()
             if not is_toc(line):
                 cur_theme = get_full_theme(line, questions_dict[cur_section].keys())
-        elif startswith_regex(line, r'^\d+\.'):
-            questions_dict[cur_section][cur_theme][line] = {'correct': '', 'variants': []}
+        elif startswith_regex(line, r"^\d+\."):
+            questions_dict[cur_section][cur_theme][line] = {
+                "correct": "",
+                "variants": [],
+            }
             cur_question = line
             if len(line) > max_var_len:
                 max_var_len = len(line)
                 max_var = line
-        elif startswith_regex(line, r'^[а-я]\)'):
-            questions_dict[cur_section][cur_theme][cur_question]['variants'].append(line)
+        elif startswith_regex(line, r"^[а-я]\)"):
+            questions_dict[cur_section][cur_theme][cur_question]["variants"].append(
+                line
+            )
         else:
             bad_lines.append(line)
 
@@ -78,16 +83,18 @@ def parse_answers(questions_dict: dict, answers_lines: list):
             cur_section = line
         if line.startswith("Тема"):
             cur_theme = line
-        if startswith_regex(line, r'^\d+\.'):
+        if startswith_regex(line, r"^\d+\."):
             for question in questions_dict[cur_section][cur_theme].keys():
-                if question.startswith(line[:line.index(".") + 1]):
-                    questions_dict[cur_section][cur_theme][question]['correct'] = line[line.index(".") + 2:].lower()
+                if question.startswith(line[: line.index(".") + 1]):
+                    questions_dict[cur_section][cur_theme][question]["correct"] = line[
+                        line.index(".") + 2 :
+                    ].lower()
 
     return questions_dict
 
 
 def save_to_json(data, path):
-    with open(path, 'w', encoding='utf-8') as file:
+    with open(path, "w", encoding="utf-8") as file:
         json.dump(data, file, indent=4, ensure_ascii=False)
 
 

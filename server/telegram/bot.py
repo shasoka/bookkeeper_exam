@@ -9,14 +9,26 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, TelegramObject, \
-    PollAnswer
+from aiogram.types import (
+    Message,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    CallbackQuery,
+    TelegramObject,
+    PollAnswer,
+)
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from aiogram3_di import setup_di, Depends
-from config import TG_TOKEN as TOKEN, SUCCESS_STATUSES, FAIL_STATUSES, SUCCESS_EFFECT_IDS, FAIL_EFFECT_IDS
+from config import (
+    TG_TOKEN as TOKEN,
+    SUCCESS_STATUSES,
+    FAIL_STATUSES,
+    SUCCESS_EFFECT_IDS,
+    FAIL_EFFECT_IDS,
+)
 from database.connection import get_async_session
 from database.models import User, Section, Theme, UserSession, Question
 
@@ -24,21 +36,16 @@ DELETE_INLINE_BUTTON = InlineKeyboardButton(text="🗑", callback_data="delete")
 
 dp = Dispatcher()
 
-bot = Bot(
-    token=TOKEN,
-    default=DefaultBotProperties(
-        parse_mode=ParseMode.HTML
-    )
-)
+bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 
 class AuthMiddleware(BaseMiddleware):
     # noinspection PyTypeChecker
     async def __call__(
-            self,
-            handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-            event: TelegramObject,
-            data: Dict[str, Any],
+        self,
+        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: Dict[str, Any],
     ) -> Any:
 
         session = await get_async_session().__anext__()
@@ -62,20 +69,23 @@ async def auth_fail_handler(event: TelegramObject):
         Плаки-плаки? 😭
         \nБесплатный только хлеб в мышеловке, братуха
         \nЧтобы получить доступ, пиши сюда ➡️ @shasoka
-        """
+        """,
+        disable_notification=True,
     )
 
 
 # noinspection PyTypeChecker
 @dp.message(CommandStart())
 async def command_start_handler(
-        message: Message,
+    message: Message, session: Annotated[AsyncSession, Depends(get_async_session)]
 ) -> None:
-    # TODO удалить сессию если есть
+
+    await clear_session(message, session)
+
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🫳🐕", callback_data="pet")],
-            [DELETE_INLINE_BUTTON]
+            [DELETE_INLINE_BUTTON],
         ]
     )
 
@@ -90,21 +100,37 @@ async def command_start_handler(
         \nНапиши /help, чтобы узнать обо мне немного больше 🤫, или выбери эту команду в {html.code('Меню')}.\nДля того, чтобы выйти из выбранной темы, напиши /restart, или выбери эту команду в {html.code('Меню')}, но учти, что я забуду твой прогресс в покинутой теме!
         \nПогладь меня, пожалуйста, и я пущу тебя к вопросам...\n\n\n🥺👇
         """,
-        reply_markup=keyboard
+        reply_markup=keyboard,
+        disable_notification=True,
     )
 
 
 # noinspection PyTypeChecker
 @dp.message(Command("restart"))
 async def command_restart_handler(
-        message: Message,
-        session: Annotated[AsyncSession, Depends(get_async_session)]
+    message: Message, session: Annotated[AsyncSession, Depends(get_async_session)]
 ):
-    user = await session.execute(select(User).where(User.telegram_id == str(message.from_user.id)).options(selectinload(User.session)))
+
+    await clear_session(message, session)
+    await pet_me_button_handler(callback_query=message)
+
+
+# noinspection PyTypeChecker
+async def clear_session(message: Message, session: AsyncSession):
+    user = await session.execute(
+        select(User)
+        .where(User.telegram_id == str(message.from_user.id))
+        .options(selectinload(User.session))
+    )
     user = user.scalars().one_or_none()
     user_session = user.session
     if user_session:
-        for msg in [user_session.cur_q_msg, user_session.cur_p_msg, user_session.cur_a_msg, user_session.cur_s_msg]:
+        for msg in [
+            user_session.cur_q_msg,
+            user_session.cur_p_msg,
+            user_session.cur_a_msg,
+            user_session.cur_s_msg,
+        ]:
             if msg:
                 try:
                     await bot.delete_message(chat_id=message.chat.id, message_id=msg)
@@ -114,12 +140,10 @@ async def command_restart_handler(
         await session.delete(user_session)
         await session.commit()
 
-    await pet_me_button_handler(callback_query=message)
-
 
 async def pet_me_button_handler(
-        callback_query: CallbackQuery | Message,
-        session: Annotated[AsyncSession, Depends(get_async_session)] = None
+    callback_query: CallbackQuery | Message,
+    session: Annotated[AsyncSession, Depends(get_async_session)] = None,
 ):
     if session is None:
         session = await get_async_session().__anext__()
@@ -128,42 +152,62 @@ async def pet_me_button_handler(
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=f"{sections[0].title}", callback_data="section_1")],
-            [InlineKeyboardButton(text=f"{sections[1].title}", callback_data="section_2")],
-            [InlineKeyboardButton(text=f"{sections[2].title}", callback_data="section_3")],
-            [DELETE_INLINE_BUTTON]
+            [
+                InlineKeyboardButton(
+                    text=f"{sections[0].title}", callback_data="section_1"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=f"{sections[1].title}", callback_data="section_2"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=f"{sections[2].title}", callback_data="section_3"
+                )
+            ],
+            [DELETE_INLINE_BUTTON],
         ]
     )
 
     if isinstance(callback_query, CallbackQuery):
         previous_message = callback_query.message
         await bot.delete_message(
-            chat_id=previous_message.chat.id,
-            message_id=previous_message.message_id
+            chat_id=previous_message.chat.id, message_id=previous_message.message_id
         )
         await callback_query.message.answer(
             "Так уж и быть! Выбирай! 🐶❤️‍🔥",
-            reply_markup=keyboard
+            reply_markup=keyboard,
+            disable_notification=True,
         )
     else:
         await bot.send_message(
             chat_id=callback_query.chat.id,
             text="А ты хитер. Можешь не гладить, выбирай раздел 🫡",
-            reply_markup=keyboard
+            reply_markup=keyboard,
+            disable_notification=True,
         )
 
 
 # noinspection PyTypeChecker
 async def select_section_handler(
-        callback_query: CallbackQuery,
-        session: Annotated[AsyncSession, Depends(get_async_session)]
+    callback_query: CallbackQuery,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
 ):
-    chosen_section = int(callback_query.data[-1]) if callback_query.data.startswith("section") else int(
-        callback_query.data[-1])
-    themes = await session.execute(select(Theme).where(Theme.section_id == chosen_section))
+    chosen_section = (
+        int(callback_query.data[-1])
+        if callback_query.data.startswith("section")
+        else int(callback_query.data[-1])
+    )
+    themes = await session.execute(
+        select(Theme).where(Theme.section_id == chosen_section)
+    )
     themes = themes.scalars().all()
 
-    start_page = 1 if callback_query.data.startswith("section") else int(callback_query.data[-3])
+    start_page = (
+        1 if callback_query.data.startswith("section") else int(callback_query.data[-3])
+    )
     per_page = 5
     start_index = (start_page - 1) * per_page
     end_index = start_page * per_page
@@ -172,19 +216,23 @@ async def select_section_handler(
 
     for i, theme in enumerate(themes[start_index:end_index]):
         keyboard.inline_keyboard.append(
-            [InlineKeyboardButton(
-                text=theme.title,
-                callback_data=f"theme_{theme.id},{str(chosen_section)}"
-            )]
+            [
+                InlineKeyboardButton(
+                    text=theme.title,
+                    callback_data=f"theme_{theme.id},{str(chosen_section)}",
+                )
+            ]
         )
 
     last_page = False
     if len(themes) > end_index:
         keyboard.inline_keyboard.append(
-            [InlineKeyboardButton(
-                text="➡️",
-                callback_data=f"page_{start_page + 1},{str(chosen_section)}"
-            )]
+            [
+                InlineKeyboardButton(
+                    text="➡️",
+                    callback_data=f"page_{start_page + 1},{str(chosen_section)}",
+                )
+            ]
         )
     else:
         last_page = True
@@ -193,74 +241,104 @@ async def select_section_handler(
     if start_page > 1:
         if last_page:
             keyboard.inline_keyboard.append(
-                [InlineKeyboardButton(
-                    text="⬅️", callback_data=f"page_{start_page - 1},{str(chosen_section)}"
-                )]
+                [
+                    InlineKeyboardButton(
+                        text="⬅️",
+                        callback_data=f"page_{start_page - 1},{str(chosen_section)}",
+                    )
+                ]
             )
         else:
             keyboard.inline_keyboard[-1].insert(
                 0,
                 InlineKeyboardButton(
                     text="⬅️",
-                    callback_data=f"page_{start_page - 1},{str(chosen_section)}"
-                )
+                    callback_data=f"page_{start_page - 1},{str(chosen_section)}",
+                ),
             )
 
-    keyboard.inline_keyboard.append([InlineKeyboardButton(text="◀️ К разделам", callback_data="pet")])
+    keyboard.inline_keyboard.append(
+        [InlineKeyboardButton(text="◀️ К разделам", callback_data="pet")]
+    )
     keyboard.inline_keyboard.append([DELETE_INLINE_BUTTON])
 
     previous_message = callback_query.message
-    await bot.delete_message(chat_id=previous_message.chat.id, message_id=previous_message.message_id)
-    await callback_query.message.answer(f"👩‍🎓 Раздел {'I' * chosen_section}:", reply_markup=keyboard)
+    await bot.delete_message(
+        chat_id=previous_message.chat.id, message_id=previous_message.message_id
+    )
+    await callback_query.message.answer(
+        f"👩‍🎓 Раздел {'I' * chosen_section}:",
+        reply_markup=keyboard,
+        disable_notification=True,
+    )
 
 
 # noinspection PyTypeChecker
 async def select_theme_handler(
-        callback_query: CallbackQuery,
-        session: Annotated[AsyncSession, Depends(get_async_session)]
+    callback_query: CallbackQuery,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
 ):
     temp_parser = callback_query.data.split(",")
     temp_parser[0] = temp_parser[0].split("_")[1]
     chosen_theme_from_callback, choosen_section = temp_parser
-    chosen_theme = await session.execute(select(Theme).where(Theme.id == int(chosen_theme_from_callback)))
+    chosen_theme = await session.execute(
+        select(Theme).where(Theme.id == int(chosen_theme_from_callback))
+    )
     chosen_theme = chosen_theme.scalars().first()
 
-    questions_total = await session.execute(select(Question.id).where(Question.theme_id == int(chosen_theme_from_callback)))
+    questions_total = await session.execute(
+        select(Question.id).where(Question.theme_id == int(chosen_theme_from_callback))
+    )
     questions_total = len(questions_total.scalars().all())
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="◀️ К темам", callback_data="section_" + choosen_section),
-            InlineKeyboardButton(text="Ехала ▶️", callback_data="quiz_init_" + chosen_theme_from_callback)
-        ],
-        [DELETE_INLINE_BUTTON]
-    ])
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="◀️ К темам", callback_data="section_" + choosen_section
+                ),
+                InlineKeyboardButton(
+                    text="Ехала ▶️",
+                    callback_data="quiz_init_" + chosen_theme_from_callback,
+                ),
+            ],
+            [DELETE_INLINE_BUTTON],
+        ]
+    )
 
     previous_message = callback_query.message
-    await bot.delete_message(chat_id=previous_message.chat.id, message_id=previous_message.message_id)
+    await bot.delete_message(
+        chat_id=previous_message.chat.id, message_id=previous_message.message_id
+    )
     await callback_query.message.answer(
         f"""
         ⚰️ Ставки сделаны, ставок больше нет... или есть?
         \nВы выбрали {html.italic(chosen_theme.title)}.
         \n❔ Вопросов в этой теме: {html.code(questions_total)}. 
         \nКнопки говорят сами за себя. Удачи.
-        """, reply_markup=keyboard)
+        """,
+        reply_markup=keyboard,
+        disable_notification=True,
+    )
 
 
 # noinspection PyTypeChecker
 async def answer_quiz_handler(
-        callback_query: CallbackQuery,
-        session: Annotated[AsyncSession, Depends(get_async_session)]
+    callback_query: CallbackQuery,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
 ):
     if callback_query.data.startswith("quiz_init"):
-        # Инициализация сессии решения теста по выбранной теме
-        theme_id = int(callback_query.data.split('_')[2])
+        theme_id = int(callback_query.data.split("_")[2])
 
-        questions = await session.execute(select(Question).where(Question.theme_id == theme_id))
+        questions = await session.execute(
+            select(Question).where(Question.theme_id == theme_id)
+        )
         questions = questions.scalars().all()
         random.shuffle(questions)
 
-        user = await session.execute(select(User).where(User.telegram_id == str(callback_query.from_user.id)))
+        user = await session.execute(
+            select(User).where(User.telegram_id == str(callback_query.from_user.id))
+        )
         user = user.scalar()
 
         new_session = UserSession(
@@ -275,13 +353,23 @@ async def answer_quiz_handler(
         await session.refresh(new_session)
 
     if callback_query.data.startswith("quiz_end"):
-        user = await session.execute(select(User).where(User.telegram_id == str(callback_query.from_user.id)).options(selectinload(User.session)))
+        user = await session.execute(
+            select(User)
+            .where(User.telegram_id == str(callback_query.from_user.id))
+            .options(selectinload(User.session))
+        )
         user = user.scalar()
 
         previous_message = callback_query.message
-        await bot.delete_message(chat_id=previous_message.chat.id, message_id=previous_message.message_id)
-        await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg)
-        await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg)
+        await bot.delete_message(
+            chat_id=previous_message.chat.id, message_id=previous_message.message_id
+        )
+        await bot.delete_message(
+            chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg
+        )
+        await bot.delete_message(
+            chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg
+        )
 
         summary_text_fail = f"""
         Ты старался, держи чоколадку 🍫
@@ -301,12 +389,21 @@ async def answer_quiz_handler(
 
         s_msg = await callback_query.message.answer(
             text=summary_text_success if success else summary_text_fail,
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text="🧩", callback_data="quiz_incorrect")]
-                ]
-            ) if not success else None,
-            message_effect_id=random.choice(SUCCESS_EFFECT_IDS)
+            reply_markup=(
+                InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text="🧩", callback_data="quiz_incorrect"
+                            )
+                        ]
+                    ]
+                )
+                if not success
+                else None
+            ),
+            message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
+            disable_notification=True,
         )
 
         user.session.cur_s_msg = s_msg.message_id
@@ -315,7 +412,11 @@ async def answer_quiz_handler(
         return
 
     if callback_query.data.startswith("quiz_incorrect"):
-        user = await session.execute(select(User).where(User.telegram_id == str(callback_query.from_user.id)).options(selectinload(User.session)))
+        user = await session.execute(
+            select(User)
+            .where(User.telegram_id == str(callback_query.from_user.id))
+            .options(selectinload(User.session))
+        )
         user = user.scalar()
         user_session = user.session
 
@@ -326,30 +427,54 @@ async def answer_quiz_handler(
         user_session.progress = 0
         await session.commit()
 
-    user = await session.execute(select(User).where(User.telegram_id == str(callback_query.from_user.id)).options(selectinload(User.session)))
+    user = await session.execute(
+        select(User)
+        .where(User.telegram_id == str(callback_query.from_user.id))
+        .options(selectinload(User.session))
+    )
     user = user.scalar()
     user_session = user.session
 
-    cur_question = await session.execute(select(Question).where(Question.id == user_session.questions_queue[user_session.progress]))
+    cur_question = await session.execute(
+        select(Question).where(
+            Question.id == user_session.questions_queue[user_session.progress]
+        )
+    )
     cur_question = cur_question.scalar()
 
     questions_total = len(user_session.questions_queue)
 
     previous_message = callback_query.message
-    await bot.delete_message(chat_id=previous_message.chat.id, message_id=previous_message.message_id)
-    if not callback_query.data.startswith("quiz_init") and not callback_query.data.startswith("quiz_incorrect"):
-        await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg)
-        await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg)
+    await bot.delete_message(
+        chat_id=previous_message.chat.id, message_id=previous_message.message_id
+    )
+    if not callback_query.data.startswith(
+        "quiz_init"
+    ) and not callback_query.data.startswith("quiz_incorrect"):
+        await bot.delete_message(
+            chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg
+        )
+        await bot.delete_message(
+            chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg
+        )
 
-    answers_str = html.italic('\n\n'.join(cur_question.answers))
-    q_msg = await callback_query.message.answer(f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n\n{html.bold(cur_question.title)}\n\n{answers_str}")
+    answers_str = html.italic("\n\n".join(cur_question.answers))
+    q_msg = await callback_query.message.answer(
+        f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n\n{html.bold(cur_question.title)}\n\n{answers_str}",
+        disable_notification=True,
+    )
 
     p_msg = await callback_query.message.answer_poll(
-        question=f"Выбери {html.bold('верный')} ответ" if len(cur_question.correct_answer) == 1 else f"Выбери {html.bold('верные')} ответы",
+        question=(
+            f"Выбери {html.bold('верный')} ответ"
+            if len(cur_question.correct_answer) == 1
+            else f"Выбери {html.bold('верные')} ответы"
+        ),
         options=[ans.lower()[:2] for ans in cur_question.answers],
         type="regular",
         allows_multiple_answers=True,
-        is_anonymous=False
+        is_anonymous=False,
+        disable_notification=True,
     )
 
     user.session.cur_q_msg = q_msg.message_id
@@ -360,19 +485,27 @@ async def answer_quiz_handler(
 # noinspection PyTypeChecker
 @dp.poll_answer()
 async def on_poll_answer(
-        poll_answer: PollAnswer,
-        session: Annotated[AsyncSession, Depends(get_async_session)]
+    poll_answer: PollAnswer,
+    session: Annotated[AsyncSession, Depends(get_async_session)],
 ):
-    user = await session.execute(select(User).where(User.telegram_id == str(poll_answer.user.id)).options(selectinload(User.session)))
+    user = await session.execute(
+        select(User)
+        .where(User.telegram_id == str(poll_answer.user.id))
+        .options(selectinload(User.session))
+    )
     user = user.scalar()
     user_session = user.session
 
-    cur_question = await session.execute(select(Question).where(Question.id == user_session.questions_queue[user_session.progress]))
+    cur_question = await session.execute(
+        select(Question).where(
+            Question.id == user_session.questions_queue[user_session.progress]
+        )
+    )
     cur_question = cur_question.scalar()
 
     questions_total = len(user_session.questions_queue)
 
-    selected_answer = ''
+    selected_answer = ""
     for i, ans in enumerate(cur_question.answers):
         if i in poll_answer.option_ids:
             selected_answer += ans[0]
@@ -382,34 +515,66 @@ async def on_poll_answer(
     if selected_answer == correct_answer:
         a_msg = await bot.send_message(
             user.telegram_id,
-            '✅ ' + html.bold(random.choice(SUCCESS_STATUSES)),
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="Далее" if user_session.progress < questions_total - 1 else "Завершить",
-                        callback_data="quiz" if user_session.progress < questions_total - 1 else "quiz_end"
-                    )
+            "✅ " + html.bold(random.choice(SUCCESS_STATUSES)),
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=(
+                                "Далее"
+                                if user_session.progress < questions_total - 1
+                                else "Завершить"
+                            ),
+                            callback_data=(
+                                "quiz"
+                                if user_session.progress < questions_total - 1
+                                else "quiz_end"
+                            ),
+                        )
+                    ]
                 ]
-            ]),
-            message_effect_id=random.choice(SUCCESS_EFFECT_IDS)
+            ),
+            message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
+            disable_notification=True,
         )
     else:
         a_msg = await bot.send_message(
             user.telegram_id,
-            '❌ ' + html.bold(random.choice(FAIL_STATUSES)) + '\n\n❕ ' + html.bold('Правильный ответ:') + ' ' + html.italic(correct_answer),
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="Далее" if user_session.progress < questions_total - 1 else "Завершить",
-                        callback_data="quiz" if user_session.progress < questions_total - 1 else "quiz_end"
-                    )
+            "❌ "
+            + html.bold(random.choice(FAIL_STATUSES))
+            + "\n\n❕ "
+            + html.bold("Правильный ответ:")
+            + " "
+            + html.italic(correct_answer),
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=(
+                                "Далее"
+                                if user_session.progress < questions_total - 1
+                                else "Завершить"
+                            ),
+                            callback_data=(
+                                "quiz"
+                                if user_session.progress < questions_total - 1
+                                else "quiz_end"
+                            ),
+                        )
+                    ]
                 ]
-            ]),
-            message_effect_id=random.choice(FAIL_EFFECT_IDS)
+            ),
+            message_effect_id=random.choice(FAIL_EFFECT_IDS),
+            disable_notification=True,
         )
         await session.execute(
-            update(UserSession).where(UserSession.id == user_session.id)
-            .values(incorrect_questions=func.array_append(user_session.incorrect_questions, cur_question.id))
+            update(UserSession)
+            .where(UserSession.id == user_session.id)
+            .values(
+                incorrect_questions=func.array_append(
+                    user_session.incorrect_questions, cur_question.id
+                )
+            )
         )
 
     user_session.cur_a_msg = a_msg.message_id
@@ -418,17 +583,22 @@ async def on_poll_answer(
 
 
 async def delete_msg_handler(
-        callback_query: CallbackQuery,
+    callback_query: CallbackQuery,
 ):
     previous_message = callback_query.message
-    await bot.delete_message(chat_id=previous_message.chat.id, message_id=previous_message.message_id)
+    await bot.delete_message(
+        chat_id=previous_message.chat.id, message_id=previous_message.message_id
+    )
 
 
-dp.callback_query.register(pet_me_button_handler, lambda c: c.data == 'pet')
-dp.callback_query.register(select_section_handler, lambda c: c.data.startswith('section') or c.data.startswith('page'))
-dp.callback_query.register(select_theme_handler, lambda c: c.data.startswith('theme'))
-dp.callback_query.register(answer_quiz_handler, lambda c: c.data.startswith('quiz'))
-dp.callback_query.register(delete_msg_handler, lambda c: c.data == 'delete')
+dp.callback_query.register(pet_me_button_handler, lambda c: c.data == "pet")
+dp.callback_query.register(select_theme_handler, lambda c: c.data.startswith("theme"))
+dp.callback_query.register(answer_quiz_handler, lambda c: c.data.startswith("quiz"))
+dp.callback_query.register(delete_msg_handler, lambda c: c.data == "delete")
+dp.callback_query.register(
+    select_section_handler,
+    lambda c: c.data.startswith("section") or c.data.startswith("page"),
+)
 
 
 async def main() -> None:
