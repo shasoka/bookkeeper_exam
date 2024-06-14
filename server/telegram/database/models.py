@@ -1,13 +1,14 @@
 from typing import Any
 
-from sqlalchemy import ForeignKey, JSON
+from sqlalchemy import ForeignKey, JSON, ARRAY, Column, Integer
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.orm import mapped_column, Mapped
 
 
 class Base(DeclarativeBase):
     type_annotation_map = {
-        dict[str, Any]: JSON
+        dict[str, Any]: JSON,
+        list[int]: ARRAY(Integer)
     }
 
 
@@ -28,6 +29,7 @@ class Theme(Base):
     section_id: Mapped[int] = mapped_column(ForeignKey("sections.id"))
 
     section: Mapped["Section"] = relationship("Section", back_populates="themes")
+    session: Mapped["UserSession"] = relationship("UserSession", back_populates="theme")
 
 
 class Question(Base):
@@ -46,3 +48,22 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[str] = mapped_column(nullable=False)
+
+    session: Mapped["UserSession"] = relationship("UserSession", back_populates="user", uselist=True)
+
+
+class UserSession(Base):
+    __tablename__ = "sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    theme_id: Mapped[int] = mapped_column(ForeignKey("themes.id"))
+    incorrect_questions: Mapped[list[int]] = mapped_column(nullable=False)
+    progress: Mapped[int] = mapped_column(nullable=False)
+    questions_queue: Mapped[list[int]] = mapped_column(nullable=False)
+    cur_q_msg: Mapped[int] = mapped_column(nullable=True, default=None)
+    cur_p_msg: Mapped[int] = mapped_column(nullable=True, default=None)
+    cur_a_msg: Mapped[int] = mapped_column(nullable=True, default=None)
+
+    user: Mapped["User"] = relationship("User", back_populates="session")
+    theme: Mapped["Theme"] = relationship("Theme", back_populates="session")

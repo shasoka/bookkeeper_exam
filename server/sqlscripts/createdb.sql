@@ -28,5 +28,19 @@ CREATE TABLE users (
     telegram_id TEXT
 );
 
+CREATE TABLE sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER,
+    theme_id INTEGER,
+    questions_queue INTEGER[],
+    progress INTEGER,
+    incorrect_questions INTEGER[],
+    cur_q_msg INTEGER default null,
+    cur_p_msg INTEGER default null,
+    cur_a_msg INTEGER default null,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (theme_id) REFERENCES themes(id)
+);
+
 INSERT INTO users (telegram_id) VALUES ('401791628');
 INSERT INTO users (telegram_id) VALUES ('760058245');
