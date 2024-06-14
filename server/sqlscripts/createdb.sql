@@ -38,6 +38,7 @@ CREATE TABLE sessions (
     cur_q_msg INTEGER default null,
     cur_p_msg INTEGER default null,
     cur_a_msg INTEGER default null,
+    cur_s_msg INTEGER default null,
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (theme_id) REFERENCES themes(id)
 );

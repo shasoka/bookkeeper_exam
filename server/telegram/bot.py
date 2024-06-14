@@ -104,7 +104,7 @@ async def command_restart_handler(
     user = user.scalars().one_or_none()
     user_session = user.session
     if user_session:
-        for msg in [user_session.cur_q_msg, user_session.cur_p_msg, user_session.cur_a_msg]:
+        for msg in [user_session.cur_q_msg, user_session.cur_p_msg, user_session.cur_a_msg, user_session.cur_s_msg]:
             if msg:
                 try:
                     await bot.delete_message(chat_id=message.chat.id, message_id=msg)
@@ -225,8 +225,7 @@ async def select_theme_handler(
     chosen_theme = await session.execute(select(Theme).where(Theme.id == int(chosen_theme_from_callback)))
     chosen_theme = chosen_theme.scalars().first()
 
-    questions_total = await session.execute(
-        select(Question.id).where(Question.theme_id == int(chosen_theme_from_callback)))
+    questions_total = await session.execute(select(Question.id).where(Question.theme_id == int(chosen_theme_from_callback)))
     questions_total = len(questions_total.scalars().all())
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -284,18 +283,48 @@ async def answer_quiz_handler(
         await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg)
         await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg)
 
-        await callback_query.message.answer(
-            text=f"""
-            Мои поздравления, держи чоколадку 🍫
-            \nПравильных вопросов: {html.code(str(len(user.session.questions_queue) - len(user.session.incorrect_questions)) + '/' + str(len(user.session.questions_queue)))}
-            \nЯ запомнил вопросы, в которых ты ошибся. Если хочешь перерешать их, жми на кнопку - 🧩 - внизу.
-            \nЕсли желаешь вернуться к выбору раздела и темы, пиши /restart ♻️
-            """,
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🧩", callback_data="incorrect")]]),
+        summary_text_fail = f"""
+        Ты старался, держи чоколадку 🍫
+        \nПравильных ответов: {html.code(str(len(user.session.questions_queue) - len(user.session.incorrect_questions)) + '/' + str(len(user.session.questions_queue)))}
+        \nЯ запомнил вопросы, в которых ты ошибся. Если хочешь перерешать их, жми на кнопку - 🧩 - внизу.
+        \nЕсли желаешь вернуться к выбору раздела и темы, пиши /restart ♻️
+        """
+
+        summary_text_success = f"""
+        Мои поздравления, держи целых две чоколадки. Вот тебе первая 🍫 и вторая 🍫
+        \nПравильных ответов: {html.code(str(len(user.session.questions_queue) - len(user.session.incorrect_questions)) + '/' + str(len(user.session.questions_queue)))}
+        \nТы - живая легенда. Горжусь 🏅
+        \nЕсли желаешь вернуться к выбору раздела и темы, пиши /restart ♻️
+        """
+
+        success = True if len(user.session.incorrect_questions) == 0 else False
+
+        s_msg = await callback_query.message.answer(
+            text=summary_text_success if success else summary_text_fail,
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="🧩", callback_data="quiz_incorrect")]
+                ]
+            ) if not success else None,
             message_effect_id=random.choice(SUCCESS_EFFECT_IDS)
         )
 
+        user.session.cur_s_msg = s_msg.message_id
+        await session.commit()
+
         return
+
+    if callback_query.data.startswith("quiz_incorrect"):
+        user = await session.execute(select(User).where(User.telegram_id == str(callback_query.from_user.id)).options(selectinload(User.session)))
+        user = user.scalar()
+        user_session = user.session
+
+        incorrects = user_session.incorrect_questions
+        random.shuffle(incorrects)
+        user_session.questions_queue = incorrects
+        user_session.incorrect_questions = []
+        user_session.progress = 0
+        await session.commit()
 
     user = await session.execute(select(User).where(User.telegram_id == str(callback_query.from_user.id)).options(selectinload(User.session)))
     user = user.scalar()
@@ -304,12 +333,11 @@ async def answer_quiz_handler(
     cur_question = await session.execute(select(Question).where(Question.id == user_session.questions_queue[user_session.progress]))
     cur_question = cur_question.scalar()
 
-    questions_total = await session.execute(select(Question.id).where(Question.theme_id == user_session.theme_id))
-    questions_total = len(questions_total.scalars().all())
+    questions_total = len(user_session.questions_queue)
 
     previous_message = callback_query.message
     await bot.delete_message(chat_id=previous_message.chat.id, message_id=previous_message.message_id)
-    if not callback_query.data.startswith("quiz_init"):
+    if not callback_query.data.startswith("quiz_init") and not callback_query.data.startswith("quiz_incorrect"):
         await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg)
         await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg)
 
@@ -342,8 +370,7 @@ async def on_poll_answer(
     cur_question = await session.execute(select(Question).where(Question.id == user_session.questions_queue[user_session.progress]))
     cur_question = cur_question.scalar()
 
-    questions_total = await session.execute(select(Question.id).where(Question.theme_id == user_session.theme_id))
-    questions_total = len(questions_total.scalars().all())
+    questions_total = len(user_session.questions_queue)
 
     selected_answer = ''
     for i, ans in enumerate(cur_question.answers):
@@ -360,7 +387,8 @@ async def on_poll_answer(
                 [
                     InlineKeyboardButton(
                         text="Далее" if user_session.progress < questions_total - 1 else "Завершить",
-                        callback_data="quiz_" + str(user.session.id) + "," + str(cur_question.id)) if user_session.progress < questions_total - 1 else "quiz_end"
+                        callback_data="quiz" if user_session.progress < questions_total - 1 else "quiz_end"
+                    )
                 ]
             ]),
             message_effect_id=random.choice(SUCCESS_EFFECT_IDS)
@@ -373,7 +401,8 @@ async def on_poll_answer(
                 [
                     InlineKeyboardButton(
                         text="Далее" if user_session.progress < questions_total - 1 else "Завершить",
-                        callback_data="quiz_" + str(user.session.id) + "," + str(cur_question.id) if user_session.progress < questions_total - 1 else "quiz_end")
+                        callback_data="quiz" if user_session.progress < questions_total - 1 else "quiz_end"
+                    )
                 ]
             ]),
             message_effect_id=random.choice(FAIL_EFFECT_IDS)

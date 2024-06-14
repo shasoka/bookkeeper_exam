@@ -64,6 +64,7 @@ class UserSession(Base):
     cur_q_msg: Mapped[int] = mapped_column(nullable=True, default=None)
     cur_p_msg: Mapped[int] = mapped_column(nullable=True, default=None)
     cur_a_msg: Mapped[int] = mapped_column(nullable=True, default=None)
+    cur_s_msg: Mapped[int] = mapped_column(nullable=False, default=None)
 
     user: Mapped["User"] = relationship("User", back_populates="session")
     theme: Mapped["Theme"] = relationship("Theme", back_populates="session")
