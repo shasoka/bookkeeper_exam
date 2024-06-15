@@ -374,11 +374,11 @@ async def answer_quiz_handler(
 
         previous_message = callback_query.message
         await bot.delete_message(chat_id=previous_message.chat.id, message_id=previous_message.message_id)
-        await asyncio.sleep(0.3)
+        # await asyncio.sleep(0.3)
         await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg)
-        await asyncio.sleep(0.3)
+#         await asyncio.sleep(0.3)
         await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg)
-        await asyncio.sleep(0.3)
+#         await asyncio.sleep(0.3)
 
         summary_text_fail = f"""
         Ты старался, держи чоколадку 🍫
@@ -455,12 +455,12 @@ async def answer_quiz_handler(
 
     previous_message = callback_query.message
     await bot.delete_message(chat_id=previous_message.chat.id, message_id=previous_message.message_id)
-    await asyncio.sleep(0.3)
+#     await asyncio.sleep(0.3)
     if not callback_query.data.startswith("quiz_init") and not callback_query.data.startswith("quiz_incorrect"):
         await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg)
-        await asyncio.sleep(0.3)
+#         await asyncio.sleep(0.3)
         await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg)
-        await asyncio.sleep(0.3)
+#         await asyncio.sleep(0.3)
 
     answers_str = html.italic("\n\n".join(cur_question.answers))
     q_msg = await callback_query.message.answer(
@@ -468,7 +468,7 @@ async def answer_quiz_handler(
         disable_notification=True,
     )
 
-    await asyncio.sleep(0.35)
+#     await asyncio.sleep(0.35)
 
     p_msg = await callback_query.message.answer_poll(
         question=(
@@ -482,7 +482,7 @@ async def answer_quiz_handler(
         is_anonymous=False,
         disable_notification=True,
     )
-    await asyncio.sleep(0.35)
+#     await asyncio.sleep(0.35)
 
     user.session.cur_q_msg = q_msg.message_id
     user.session.cur_p_msg = p_msg.message_id
@@ -519,7 +519,7 @@ async def on_poll_answer(
 
     correct_answer = cur_question.correct_answer
 
-    await asyncio.sleep(0.35)
+#     await asyncio.sleep(0.35)
 
     if selected_answer == correct_answer:
         a_msg = await bot.send_message(
@@ -611,10 +611,14 @@ dp.callback_query.register(
 
 
 async def main() -> None:
-    setup_di(dp)
     await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
+    # Логгер
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+
+    # Инверсия зависимостей
+    setup_di(dp)
+    # Запуск бота
     asyncio.run(main())
