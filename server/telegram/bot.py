@@ -54,9 +54,11 @@ class AuthMiddleware(BaseMiddleware):
             user = await session.execute(
                 select(User).where(User.telegram_id == str(event.from_user.id))
             )
-            if not user.one_or_none():
+            if not user.first():
+                await session.close()
                 return await auth_fail_handler(event)
             else:
+                await session.close()
                 return await handler(event, data)
 
 
@@ -124,7 +126,7 @@ async def clear_session(message: Message):
         .where(User.telegram_id == str(message.from_user.id))
         .options(selectinload(User.session))
     )
-    user = user.scalars().one_or_none()
+    user = user.scalars().first()
     user_session = user.session
     if user_session:
         for msg in [
@@ -140,7 +142,9 @@ async def clear_session(message: Message):
                     pass
 
         await session.delete(user_session)
-    await session.commit()
+        await session.commit()
+
+    await session.close()
 
 
 async def pet_me_button_handler(
@@ -148,8 +152,10 @@ async def pet_me_button_handler(
     session: Annotated[AsyncSession, Depends(get_async_session)] = None,
 ):
 
+    di = True
     if not session:
         session = await get_async_session().asend(None)
+        di = False
     sections = await session.execute(select(Section))
     sections = sections.scalars().all()
 
@@ -191,6 +197,9 @@ async def pet_me_button_handler(
             reply_markup=keyboard,
             disable_notification=True,
         )
+
+    if not di:
+        await session.close()
 
 
 # noinspection PyTypeChecker

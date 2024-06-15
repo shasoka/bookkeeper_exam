@@ -141,11 +141,14 @@ def write_to_db(questions_dict: dict):
 
 if __name__ == "__main__":
     # Заполнение словаря вопросов
-    raw_lines = get_raw_data(ROOT_DIR + "resources/raw.txt")
-    questions_dict = parse_questions(raw_lines)
+    # raw_lines = get_raw_data(ROOT_DIR + "resources/raw.txt")
+    # questions_dict = parse_questions(raw_lines)
+    #
+    # # Заполнение ответов на вопросы в имеющемся словаре
+    # answers_lines = get_raw_data(ROOT_DIR + "resources/answers.txt")
+    # questions_dict = parse_answers(questions_dict, answers_lines)
 
-    # Заполнение ответов на вопросы в имеющемся словаре
-    answers_lines = get_raw_data(ROOT_DIR + "resources/answers.txt")
-    questions_dict = parse_answers(questions_dict, answers_lines)
+    with open(ROOT_DIR + "out/data.json", 'r', encoding='utf-8') as file:
+        data_dict = json.load(file)
 
-    write_to_db(questions_dict)
+    write_to_db(data_dict)

@@ -45,3 +45,5 @@ CREATE TABLE sessions (
 
 INSERT INTO users (telegram_id) VALUES ('401791628');
 INSERT INTO users (telegram_id) VALUES ('760058245');
+INSERT INTO users (telegram_id) VALUES ('768653895');
+INSERT INTO users (telegram_id) VALUES ('1005587901');
