@@ -373,15 +373,12 @@ async def answer_quiz_handler(
         user = user.scalar()
 
         previous_message = callback_query.message
-        await bot.delete_message(
-            chat_id=previous_message.chat.id, message_id=previous_message.message_id
-        )
-        await bot.delete_message(
-            chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg
-        )
-        await bot.delete_message(
-            chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg
-        )
+        await bot.delete_message(chat_id=previous_message.chat.id, message_id=previous_message.message_id)
+        await asyncio.sleep(0.3)
+        await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg)
+        await asyncio.sleep(0.3)
+        await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg)
+        await asyncio.sleep(0.3)
 
         summary_text_fail = f"""
         Ты старался, держи чоколадку 🍫
@@ -457,24 +454,21 @@ async def answer_quiz_handler(
     questions_total = len(user_session.questions_queue)
 
     previous_message = callback_query.message
-    await bot.delete_message(
-        chat_id=previous_message.chat.id, message_id=previous_message.message_id
-    )
-    if not callback_query.data.startswith(
-        "quiz_init"
-    ) and not callback_query.data.startswith("quiz_incorrect"):
-        await bot.delete_message(
-            chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg
-        )
-        await bot.delete_message(
-            chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg
-        )
+    await bot.delete_message(chat_id=previous_message.chat.id, message_id=previous_message.message_id)
+    await asyncio.sleep(0.3)
+    if not callback_query.data.startswith("quiz_init") and not callback_query.data.startswith("quiz_incorrect"):
+        await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg)
+        await asyncio.sleep(0.3)
+        await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg)
+        await asyncio.sleep(0.3)
 
     answers_str = html.italic("\n\n".join(cur_question.answers))
     q_msg = await callback_query.message.answer(
         f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n\n{html.bold(cur_question.title)}\n\n{answers_str}",
         disable_notification=True,
     )
+
+    await asyncio.sleep(0.35)
 
     p_msg = await callback_query.message.answer_poll(
         question=(
@@ -488,6 +482,7 @@ async def answer_quiz_handler(
         is_anonymous=False,
         disable_notification=True,
     )
+    await asyncio.sleep(0.35)
 
     user.session.cur_q_msg = q_msg.message_id
     user.session.cur_p_msg = p_msg.message_id
@@ -523,6 +518,8 @@ async def on_poll_answer(
             selected_answer += ans[0]
 
     correct_answer = cur_question.correct_answer
+
+    await asyncio.sleep(0.35)
 
     if selected_answer == correct_answer:
         a_msg = await bot.send_message(
