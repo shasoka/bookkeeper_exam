@@ -48,7 +48,7 @@ class AuthMiddleware(BaseMiddleware):
         data: Dict[str, Any],
     ) -> Any:
 
-        session = await get_async_session().__anext__()
+        session = await get_async_session().asend(None)
 
         if event.from_user:
             user = await session.execute(
@@ -77,10 +77,10 @@ async def auth_fail_handler(event: TelegramObject):
 # noinspection PyTypeChecker
 @dp.message(CommandStart())
 async def command_start_handler(
-    message: Message, session: Annotated[AsyncSession, Depends(get_async_session)]
+    message: Message
 ) -> None:
 
-    await clear_session(message, session)
+    await clear_session(message)
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -108,15 +108,17 @@ async def command_start_handler(
 # noinspection PyTypeChecker
 @dp.message(Command("restart"))
 async def command_restart_handler(
-    message: Message, session: Annotated[AsyncSession, Depends(get_async_session)]
+    message: Message
 ):
 
-    await clear_session(message, session)
+    await clear_session(message)
     await pet_me_button_handler(callback_query=message)
 
 
 # noinspection PyTypeChecker
-async def clear_session(message: Message, session: AsyncSession):
+async def clear_session(message: Message):
+    session = await get_async_session().asend(None)
+
     user = await session.execute(
         select(User)
         .where(User.telegram_id == str(message.from_user.id))
@@ -138,15 +140,16 @@ async def clear_session(message: Message, session: AsyncSession):
                     pass
 
         await session.delete(user_session)
-        await session.commit()
+    await session.commit()
 
 
 async def pet_me_button_handler(
     callback_query: CallbackQuery | Message,
     session: Annotated[AsyncSession, Depends(get_async_session)] = None,
 ):
-    if session is None:
-        session = await get_async_session().__anext__()
+
+    if not session:
+        session = await get_async_session().asend(None)
     sections = await session.execute(select(Section))
     sections = sections.scalars().all()
 
