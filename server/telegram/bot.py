@@ -74,6 +74,12 @@ async def auth_fail_handler(event: TelegramObject):
         """,
         disable_notification=True,
     )
+    # return await event.answer(
+    #     """
+    #     Технические работы 😭
+    #     """,
+    #     disable_notification=True,
+    # )
 
 
 # noinspection PyTypeChecker
@@ -374,11 +380,8 @@ async def answer_quiz_handler(
 
         previous_message = callback_query.message
         await bot.delete_message(chat_id=previous_message.chat.id, message_id=previous_message.message_id)
-        # await asyncio.sleep(0.3)
         await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg)
-#         await asyncio.sleep(0.3)
         await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg)
-#         await asyncio.sleep(0.3)
 
         summary_text_fail = f"""
         Ты старался, держи чоколадку 🍫
@@ -455,20 +458,25 @@ async def answer_quiz_handler(
 
     previous_message = callback_query.message
     await bot.delete_message(chat_id=previous_message.chat.id, message_id=previous_message.message_id)
-#     await asyncio.sleep(0.3)
     if not callback_query.data.startswith("quiz_init") and not callback_query.data.startswith("quiz_incorrect"):
         await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg)
-#         await asyncio.sleep(0.3)
         await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg)
-#         await asyncio.sleep(0.3)
 
-    answers_str = html.italic("\n\n".join(cur_question.answers))
+    answers = []
+    for i, ans in enumerate(cur_question.answers):
+        cur_ans = -1
+        if ans[1] == ')':
+            ans.replace("\n", " ")
+            answers.append(ans.lower())
+            cur_ans += 1
+        else:
+            answers[cur_ans] += (', ' + ans.lower())
+    answers.sort(key=lambda x: x[0])
+    answers_str = html.italic("\n\n".join(answers))
     q_msg = await callback_query.message.answer(
         f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n\n{html.bold(cur_question.title)}\n\n{answers_str}",
         disable_notification=True,
     )
-
-#     await asyncio.sleep(0.35)
 
     p_msg = await callback_query.message.answer_poll(
         question=(
@@ -476,13 +484,12 @@ async def answer_quiz_handler(
             if len(cur_question.correct_answer) == 1
             else f"Выбери {html.bold('верные')} ответы"
         ),
-        options=[ans.lower()[:2] for ans in cur_question.answers],
+        options=[ans.lower()[:2] for ans in answers],
         type="regular",
         allows_multiple_answers=True,
         is_anonymous=False,
         disable_notification=True,
     )
-#     await asyncio.sleep(0.35)
 
     user.session.cur_q_msg = q_msg.message_id
     user.session.cur_p_msg = p_msg.message_id
@@ -513,13 +520,11 @@ async def on_poll_answer(
     questions_total = len(user_session.questions_queue)
 
     selected_answer = ""
-    for i, ans in enumerate(cur_question.answers):
+    for i, ans in enumerate(sorted(cur_question.answers, key=lambda x: x[0])):
         if i in poll_answer.option_ids:
             selected_answer += ans[0]
 
     correct_answer = cur_question.correct_answer
-
-#     await asyncio.sleep(0.35)
 
     if selected_answer == correct_answer:
         a_msg = await bot.send_message(
