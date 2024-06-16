@@ -46,6 +46,7 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[str] = mapped_column(nullable=False)
+    checked_update: Mapped[bool] = mapped_column(nullable=False, default=False)
 
     session: Mapped["UserSession"] = relationship(
         "UserSession", back_populates="user", uselist=True

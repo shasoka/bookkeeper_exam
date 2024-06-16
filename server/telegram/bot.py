@@ -23,6 +23,7 @@ from config import TG_TOKEN as TOKEN
 from database.connection import get_async_session
 from database.models import User, UserSession, Question
 from middleware.auth_mw import AuthMiddleware
+from middleware.update import ChangeLogMiddleware
 from resources.buttons import DELETE_INLINE_BUTTON
 from resources.strings import (
     SUCCESS_STATUSES,
@@ -431,6 +432,7 @@ def get_answers_string(raw_answers: list[str]) -> tuple[list, str]:
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 dp.message.outer_middleware(AuthMiddleware())
+dp.message.outer_middleware(ChangeLogMiddleware())
 dp.callback_query.register(pet_me_button_pressed, lambda c: c.data == "pet")
 dp.callback_query.register(theme_button_pressed, lambda c: c.data.startswith("theme"))
 dp.callback_query.register(quiz_started, lambda c: c.data.startswith("quiz"))

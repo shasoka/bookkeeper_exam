@@ -19,6 +19,16 @@ async def get_user(telegram_id: str) -> User:
 
 
 # noinspection PyTypeChecker
+async def changelog_seen(telegram_id: str) -> None:
+    async with SessionLocal() as session:
+        user = await session.execute(select(User).where(User.telegram_id == telegram_id))
+        user = user.scalars().first()
+        user.checked_update = True
+        await session.commit()
+        await session.refresh(user)
+
+
+# noinspection PyTypeChecker
 async def get_user_with_session(telegram_id: str) -> User:
     async with SessionLocal() as session:
         user = await session.execute(
