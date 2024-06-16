@@ -519,8 +519,15 @@ async def on_poll_answer(
 
     questions_total = len(user_session.questions_queue)
 
+    answers = []
+    for i, ans in enumerate(cur_question.answers):
+        if ans[1] == ')':
+            answers.append(ans[0].lower())
+        else:
+            continue
+    answers.sort(key=lambda x: x[0])
     selected_answer = ""
-    for i, ans in enumerate(sorted(cur_question.answers, key=lambda x: x[0])):
+    for i, ans in enumerate(answers):
         if i in poll_answer.option_ids:
             selected_answer += ans[0]
 
