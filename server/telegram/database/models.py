@@ -1,11 +1,12 @@
 from typing import Any
 
 from sqlalchemy import ForeignKey, JSON, ARRAY, Integer
+from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.orm import mapped_column, Mapped
 
 
-class Base(DeclarativeBase):
+class Base(AsyncAttrs, DeclarativeBase):
     type_annotation_map = {dict[str, Any]: JSON, list[int]: ARRAY(Integer)}
 
 

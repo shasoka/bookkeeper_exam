@@ -15,8 +15,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     CallbackQuery,
     TelegramObject,
-    PollAnswer,
-)
+    PollAnswer, )
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -29,7 +28,7 @@ from config import (
     SUCCESS_EFFECT_IDS,
     FAIL_EFFECT_IDS,
 )
-from database.connection import get_async_session
+from database.connection import get_async_session, SessionLocal
 from database.models import User, Section, Theme, UserSession, Question
 
 DELETE_INLINE_BUTTON = InlineKeyboardButton(text="🗑", callback_data="delete")
@@ -48,18 +47,17 @@ class AuthMiddleware(BaseMiddleware):
         data: Dict[str, Any],
     ) -> Any:
 
-        session = await get_async_session().asend(None)
-
-        if event.from_user:
-            user = await session.execute(
-                select(User).where(User.telegram_id == str(event.from_user.id))
-            )
-            if not user.first():
-                await session.close()
-                return await auth_fail_handler(event)
-            else:
-                await session.close()
-                return await handler(event, data)
+        async with SessionLocal() as session:
+            if event.from_user:
+                user = await session.execute(
+                    select(User).where(User.telegram_id == str(event.from_user.id))
+                )
+                if not user.first():
+                    await session.commit()
+                    return await auth_fail_handler(event)
+                else:
+                    await session.commit()
+                    return await handler(event, data)
 
 
 dp.message.outer_middleware(AuthMiddleware())
@@ -125,32 +123,29 @@ async def command_restart_handler(
 
 # noinspection PyTypeChecker
 async def clear_session(message: Message):
-    session = await get_async_session().asend(None)
+    async with SessionLocal() as session:
+        user = await session.execute(
+            select(User)
+            .where(User.telegram_id == str(message.from_user.id))
+            .options(selectinload(User.session))
+        )
+        user = user.scalars().first()
+        user_session = user.session
+        if user_session:
+            for msg in [
+                user_session.cur_q_msg,
+                user_session.cur_p_msg,
+                user_session.cur_a_msg,
+                user_session.cur_s_msg,
+            ]:
+                if msg:
+                    try:
+                        await bot.delete_message(chat_id=message.chat.id, message_id=msg)
+                    except TelegramBadRequest:
+                        pass
 
-    user = await session.execute(
-        select(User)
-        .where(User.telegram_id == str(message.from_user.id))
-        .options(selectinload(User.session))
-    )
-    user = user.scalars().first()
-    user_session = user.session
-    if user_session:
-        for msg in [
-            user_session.cur_q_msg,
-            user_session.cur_p_msg,
-            user_session.cur_a_msg,
-            user_session.cur_s_msg,
-        ]:
-            if msg:
-                try:
-                    await bot.delete_message(chat_id=message.chat.id, message_id=msg)
-                except TelegramBadRequest:
-                    pass
-
-        await session.delete(user_session)
-        await session.commit()
-
-    await session.close()
+            await session.delete(user_session)
+            await session.commit()
 
 
 async def pet_me_button_handler(
