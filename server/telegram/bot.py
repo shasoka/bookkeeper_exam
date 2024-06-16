@@ -2,261 +2,149 @@ import asyncio
 import logging
 import random
 import sys
-from typing import Annotated, Callable, Any, Dict, Awaitable
+from typing import Annotated
 
-from aiogram import Bot, Dispatcher, html, BaseMiddleware
+from aiogram import Bot, Dispatcher, html
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart, Command
 from aiogram.types import (
     Message,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     CallbackQuery,
-    TelegramObject,
     PollAnswer, )
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from aiogram3_di import setup_di, Depends
-from config import (
-    TG_TOKEN as TOKEN,
+from config import TG_TOKEN as TOKEN
+from database.connection import get_async_session
+from database.models import User, UserSession, Question
+from middleware.auth_mw import AuthMiddleware
+from resources.buttons import DELETE_INLINE_BUTTON
+from resources.strings import (
     SUCCESS_STATUSES,
     FAIL_STATUSES,
     SUCCESS_EFFECT_IDS,
-    FAIL_EFFECT_IDS,
+    FAIL_EFFECT_IDS, on_start_msg, RESTART_COMMAND, PET_ME, SECTIONS_FROM_RESTART, SECTIONS_FROM_START,
+    on_section_chosen, FORWARD, BACK, BACK_TO_SECTIONS, BACK_TO_THEMES, LETS_GO, on_theme_chosen, on_quiz_end_success,
+    on_quiz_end_fail, LETS_SHUFFLE, HINT, NO_MORE_HINTS,
 )
-from database.connection import get_async_session, SessionLocal
-from database.models import User, Section, Theme, UserSession, Question
+from services.service import (
+    get_questions_with_len_by_theme,
+    get_cur_question_with_count,
+    get_sections,
+    get_themes_by_section,
+    get_theme_by_id,
+    clear_session,
+    init_session,
+    get_user_with_session,
+    save_msg_id,
+    rerun_session, decrease_hints
+)
 
-DELETE_INLINE_BUTTON = InlineKeyboardButton(text="🗑", callback_data="delete")
 
 dp = Dispatcher()
-
-bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-
-
-class AuthMiddleware(BaseMiddleware):
-    # noinspection PyTypeChecker
-    async def __call__(
-        self,
-        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-        event: TelegramObject,
-        data: Dict[str, Any],
-    ) -> Any:
-
-        async with SessionLocal() as session:
-            if event.from_user:
-                user = await session.execute(
-                    select(User).where(User.telegram_id == str(event.from_user.id))
-                )
-                if not user.first():
-                    await session.commit()
-                    return await auth_fail_handler(event)
-                else:
-                    await session.commit()
-                    return await handler(event, data)
-
-
-dp.message.outer_middleware(AuthMiddleware())
-
-
-async def auth_fail_handler(event: TelegramObject):
-    return await event.answer(
-        """
-        Плаки-плаки? 😭
-        \nБесплатный только хлеб в мышеловке, братуха
-        \nЧтобы получить доступ, пиши сюда ➡️ @shasoka
-        """,
-        disable_notification=True,
-    )
-    # return await event.answer(
-    #     """
-    #     Технические работы 😭
-    #     """,
-    #     disable_notification=True,
-    # )
 
 
 # noinspection PyTypeChecker
 @dp.message(CommandStart())
-async def command_start_handler(
-    message: Message
-) -> None:
-
-    await clear_session(message)
+async def command_start_handler(message: Message) -> None:
+    await clear_session(message, bot)
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🫳🐕", callback_data="pet")],
+            [InlineKeyboardButton(text=PET_ME, callback_data="pet")],
             [DELETE_INLINE_BUTTON],
         ]
     )
 
     await message.answer(
-        f"""
-        Привет 👋, {html.bold(message.from_user.full_name)}!
-        \nМеня зовут {html.bold('Саймон')} и я ... {html.spoiler(html.italic('косоглазый 👀'))}, но это не помешает мне проверить твои знания по бухучету.
-        \n☑️ Я приготовил для тебя {html.code('1061')} {html.bold('тестовое')} задание (у меня {html.bold('нет')} заданий с установкой порядка или соответсивия, а также вставкой слов), которые разбиты на {html.code('31')} тему и {html.code('3')} раздела:
-        \n1. {html.bold('Теория бухучета')}\n2. {html.bold('Бухгалтерский (финансовый) учет')}\n3. {html.bold('ФЗ "О бухгалтерсом учете", ПБУ')}
-        \nЯ умею отслеживать твои результаты в пределах выбранной темы, чтобы после завершения теста ты мог прорешать заново те вопросы, на которых облажался.
-        \nРади собственного удобства ты можешь периодически очищать чат со мной. Сам я этого делать не умею, увы... Средства, которыми я реализован, не позволяют мне очищать чат полностью. Но под каждым сообщением, которое я не сумею удалить сам будет кнопка - 🗑 - для его быстрогого удаления.
-        \nДля того, чтобы выйти из выбранной темы, напиши /restart, или выбери эту команду в {html.code('Меню')}, но учти, что я забуду твой прогресс в покинутой теме!\nКоманда /start запустит меня с самого начала, так что советую пользоваться завершением сессии через /restart.
-        \nПогладь меня, пожалуйста, и я пущу тебя к вопросам...\n\n\n🥺👇
-        """,
+        on_start_msg(message.from_user.full_name),
         reply_markup=keyboard,
         disable_notification=True,
     )
 
 
 # noinspection PyTypeChecker
-@dp.message(Command("restart"))
-async def command_restart_handler(
-    message: Message
-):
-
-    await clear_session(message)
-    await pet_me_button_handler(callback_query=message)
+@dp.message(Command(RESTART_COMMAND))
+async def command_restart_handler(message: Message) -> None:
+    await clear_session(message, bot)
+    await pet_me_button_pressed(callback_query=message)
 
 
 # noinspection PyTypeChecker
-async def clear_session(message: Message):
-    async with SessionLocal() as session:
-        user = await session.execute(
-            select(User)
-            .where(User.telegram_id == str(message.from_user.id))
-            .options(selectinload(User.session))
-        )
-        user = user.scalars().first()
-        user_session = user.session
-        if user_session:
-            for msg in [
-                user_session.cur_q_msg,
-                user_session.cur_p_msg,
-                user_session.cur_a_msg,
-                user_session.cur_s_msg,
-            ]:
-                if msg:
-                    try:
-                        await bot.delete_message(chat_id=message.chat.id, message_id=msg)
-                    except TelegramBadRequest:
-                        pass
-
-            await session.delete(user_session)
-            await session.commit()
-
-
-async def pet_me_button_handler(
-    callback_query: CallbackQuery | Message,
-    session: Annotated[AsyncSession, Depends(get_async_session)] = None,
-):
-
-    di = True
-    if not session:
-        session = await get_async_session().asend(None)
-        di = False
-    sections = await session.execute(select(Section))
-    sections = sections.scalars().all()
-
+async def pet_me_button_pressed(callback_query: CallbackQuery | Message) -> None:
+    sections = await get_sections()
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=f"{sections[0].title}", callback_data="section_1"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=f"{sections[1].title}", callback_data="section_2"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=f"{sections[2].title}", callback_data="section_3"
-                )
-            ],
+            [InlineKeyboardButton(text=f"{sections[0].title}", callback_data="section_1")],
+            [InlineKeyboardButton(text=f"{sections[1].title}", callback_data="section_2")],
+            [InlineKeyboardButton(text=f"{sections[2].title}", callback_data="section_3")],
             [DELETE_INLINE_BUTTON],
         ]
     )
 
     if isinstance(callback_query, CallbackQuery):
-        previous_message = callback_query.message
-        await bot.delete_message(
-            chat_id=previous_message.chat.id, message_id=previous_message.message_id
-        )
+        await delete_msg_handler(callback_query)
         await callback_query.message.answer(
-            "Так уж и быть! Выбирай! 🐶❤️‍🔥",
+            SECTIONS_FROM_START,
             reply_markup=keyboard,
             disable_notification=True,
         )
     else:
         await bot.send_message(
             chat_id=callback_query.chat.id,
-            text="А ты хитер. Можешь не гладить, выбирай раздел 🫡",
+            text=SECTIONS_FROM_RESTART,
             reply_markup=keyboard,
             disable_notification=True,
         )
 
-    if not di:
-        await session.close()
-
 
 # noinspection PyTypeChecker
-async def select_section_handler(
-    callback_query: CallbackQuery,
-    session: Annotated[AsyncSession, Depends(get_async_session)],
-):
-    chosen_section = (
-        int(callback_query.data[-1])
-        if callback_query.data.startswith("section")
-        else int(callback_query.data[-1])
-    )
-    themes = await session.execute(
-        select(Theme).where(Theme.section_id == chosen_section)
-    )
-    themes = themes.scalars().all()
-
-    start_page = (
-        1 if callback_query.data.startswith("section") else int(callback_query.data[-3])
-    )
+async def section_button_pressed(callback_query: CallbackQuery) -> None:
+    chosen_section = int(callback_query.data[-1])
+    themes = await get_themes_by_section(chosen_section)
+    start_page = 1 if callback_query.data.startswith("section") else int(callback_query.data[-3])
     per_page = 5
     start_index = (start_page - 1) * per_page
     end_index = start_page * per_page
-
     keyboard = InlineKeyboardMarkup(inline_keyboard=[])
+    last_page = False
 
+    # Добавление кнопок тем
     for i, theme in enumerate(themes[start_index:end_index]):
         keyboard.inline_keyboard.append(
             [
                 InlineKeyboardButton(
                     text=theme.title,
-                    callback_data=f"theme_{theme.id},{str(chosen_section)}",
+                    callback_data=f"theme_{theme.id}_{str(chosen_section)}",
                 )
             ]
         )
 
-    last_page = False
+    # Добавление кнопки перехода на следующую страницу
     if len(themes) > end_index:
         keyboard.inline_keyboard.append(
             [
                 InlineKeyboardButton(
-                    text="➡️",
-                    callback_data=f"page_{start_page + 1},{str(chosen_section)}",
+                    text=FORWARD,
+                    callback_data=f"page_{start_page + 1}_{str(chosen_section)}",
                 )
             ]
         )
     else:
         last_page = True
 
-    # Add previous page button if not on the first page
+    # Добавление кнопки перехода на предыдущую страницу
     if start_page > 1:
         if last_page:
             keyboard.inline_keyboard.append(
                 [
                     InlineKeyboardButton(
-                        text="⬅️",
+                        text=BACK,
                         callback_data=f"page_{start_page - 1},{str(chosen_section)}",
                     )
                 ]
@@ -265,146 +153,81 @@ async def select_section_handler(
             keyboard.inline_keyboard[-1].insert(
                 0,
                 InlineKeyboardButton(
-                    text="⬅️",
+                    text=BACK,
                     callback_data=f"page_{start_page - 1},{str(chosen_section)}",
                 ),
             )
 
-    keyboard.inline_keyboard.append(
-        [InlineKeyboardButton(text="◀️ К разделам", callback_data="pet")]
-    )
+    # Добавление кнопки возвращения к разделам
+    keyboard.inline_keyboard.append([InlineKeyboardButton(text=BACK_TO_SECTIONS, callback_data="pet")])
+    # Добавление кнопки удаления сообщения
     keyboard.inline_keyboard.append([DELETE_INLINE_BUTTON])
 
-    previous_message = callback_query.message
-    await bot.delete_message(
-        chat_id=previous_message.chat.id, message_id=previous_message.message_id
-    )
+    await delete_msg_handler(callback_query)
     await callback_query.message.answer(
-        f"👩‍🎓 Раздел {'I' * chosen_section}:",
+        on_section_chosen(chosen_section),
         reply_markup=keyboard,
         disable_notification=True,
     )
 
 
 # noinspection PyTypeChecker
-async def select_theme_handler(
-    callback_query: CallbackQuery,
-    session: Annotated[AsyncSession, Depends(get_async_session)],
-):
-    temp_parser = callback_query.data.split(",")
-    temp_parser[0] = temp_parser[0].split("_")[1]
-    chosen_theme_from_callback, choosen_section = temp_parser
-    chosen_theme = await session.execute(
-        select(Theme).where(Theme.id == int(chosen_theme_from_callback))
-    )
-    chosen_theme = chosen_theme.scalars().first()
+async def theme_button_pressed(callback_query: CallbackQuery) -> None:
+    chosen_theme_from_callback, choosen_section = callback_query.data.split('_')[1:]
+    chosen_theme = await get_theme_by_id(int(chosen_theme_from_callback))
 
-    questions_total = await session.execute(
-        select(Question.id).where(Question.theme_id == int(chosen_theme_from_callback))
-    )
-    questions_total = len(questions_total.scalars().all())
+    _, questions_total = await get_questions_with_len_by_theme(int(chosen_theme_from_callback))
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(
-                    text="◀️ К темам", callback_data="section_" + choosen_section
-                ),
-                InlineKeyboardButton(
-                    text="Ехала ▶️",
-                    callback_data="quiz_init_" + chosen_theme_from_callback,
-                ),
+                InlineKeyboardButton(text=BACK_TO_THEMES, callback_data="section_" + choosen_section),
+                InlineKeyboardButton(text=LETS_GO, callback_data="quiz_init_" + chosen_theme_from_callback),
             ],
+            [InlineKeyboardButton(text=LETS_SHUFFLE, callback_data="quiz_init_shuffle_" + chosen_theme_from_callback)],
             [DELETE_INLINE_BUTTON],
         ]
     )
 
-    previous_message = callback_query.message
-    await bot.delete_message(
-        chat_id=previous_message.chat.id, message_id=previous_message.message_id
-    )
+    await delete_msg_handler(callback_query)
     await callback_query.message.answer(
-        f"""
-        ⚰️ Ставки сделаны, ставок больше нет... или есть?
-        \nВы выбрали {html.italic(chosen_theme.title)}.
-        \n❔ Вопросов в этой теме: {html.code(questions_total)}. 
-        \nКнопки говорят сами за себя. Удачи.
-        """,
+        on_theme_chosen(chosen_theme.title, str(questions_total)),
         reply_markup=keyboard,
         disable_notification=True,
     )
 
 
 # noinspection PyTypeChecker
-async def answer_quiz_handler(
-    callback_query: CallbackQuery,
-    session: Annotated[AsyncSession, Depends(get_async_session)],
-):
+async def quiz_started(callback_query: CallbackQuery) -> None:
     if callback_query.data.startswith("quiz_init"):
-        theme_id = int(callback_query.data.split("_")[2])
-
-        questions = await session.execute(
-            select(Question).where(Question.theme_id == theme_id)
+        await init_session(
+            theme_id=int(callback_query.data.split("_")[-1]),
+            telegram_id=str(callback_query.from_user.id),
+            shuffle=True if "shuffle" in callback_query.data else False
         )
-        questions = questions.scalars().all()
-        random.shuffle(questions)
 
-        user = await session.execute(
-            select(User).where(User.telegram_id == str(callback_query.from_user.id))
-        )
-        user = user.scalar()
-
-        new_session = UserSession(
-            user_id=user.id,
-            theme_id=theme_id,
-            incorrect_questions=[],
-            questions_queue=[q.id for q in questions],
-            progress=0,
-        )
-        session.add(new_session)
-        await session.commit()
-        await session.refresh(new_session)
+    if callback_query.data.startswith("quiz_incorrect"):
+        await rerun_session(telegram_id=str(callback_query.from_user.id))
 
     if callback_query.data.startswith("quiz_end"):
-        user = await session.execute(
-            select(User)
-            .where(User.telegram_id == str(callback_query.from_user.id))
-            .options(selectinload(User.session))
-        )
-        user = user.scalar()
-
-        previous_message = callback_query.message
-        await bot.delete_message(chat_id=previous_message.chat.id, message_id=previous_message.message_id)
-        await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg)
-        await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg)
-
-        summary_text_fail = f"""
-        Ты старался, держи чоколадку 🍫
-        \nПравильных ответов: {html.code(str(len(user.session.questions_queue) - len(user.session.incorrect_questions)) + '/' + str(len(user.session.questions_queue)))}
-        \nЯ запомнил вопросы, в которых ты ошибся. Если хочешь перерешать их, жми на кнопку - 🧩 - внизу.
-        \nЕсли желаешь вернуться к выбору раздела и темы, пиши /restart ♻️
-        """
-
-        summary_text_success = f"""
-        Мои поздравления, держи целых две чоколадки. Вот тебе первая 🍫 и вторая 🍫
-        \nПравильных ответов: {html.code(str(len(user.session.questions_queue) - len(user.session.incorrect_questions)) + '/' + str(len(user.session.questions_queue)))}
-        \nТы - живая легенда. Горжусь 🏅
-        \nЕсли желаешь вернуться к выбору раздела и темы, пиши /restart ♻️
-        """
+        user = await get_user_with_session(str(callback_query.from_user.id))
+        for msg_id in [
+            callback_query.message.message_id,
+            user.session.cur_p_msg,
+            user.session.cur_q_msg
+        ]:
+            await delete_msg_handler(
+                callback_query,
+                chat_id=callback_query.message.chat.id,
+                message_id=msg_id
+            )
 
         success = True if len(user.session.incorrect_questions) == 0 else False
-
         s_msg = await callback_query.message.answer(
-            text=summary_text_success if success else summary_text_fail,
+            text=on_quiz_end_success(user.session) if success else on_quiz_end_fail(user.session),
             reply_markup=(
                 InlineKeyboardMarkup(
-                    inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text="🧩", callback_data="quiz_incorrect"
-                            )
-                        ]
-                    ]
+                    inline_keyboard=[[InlineKeyboardButton(text="🧩", callback_data="quiz_incorrect")]]
                 )
                 if not success
                 else None
@@ -413,64 +236,39 @@ async def answer_quiz_handler(
             disable_notification=True,
         )
 
-        user.session.cur_s_msg = s_msg.message_id
-        await session.commit()
-
+        await save_msg_id(user.telegram_id, s_msg.message_id, "s")
         return
 
-    if callback_query.data.startswith("quiz_incorrect"):
-        user = await session.execute(
-            select(User)
-            .where(User.telegram_id == str(callback_query.from_user.id))
-            .options(selectinload(User.session))
-        )
-        user = user.scalar()
-        user_session = user.session
-
-        incorrects = user_session.incorrect_questions
-        random.shuffle(incorrects)
-        user_session.questions_queue = incorrects
-        user_session.incorrect_questions = []
-        user_session.progress = 0
-        await session.commit()
-
-    user = await session.execute(
-        select(User)
-        .where(User.telegram_id == str(callback_query.from_user.id))
-        .options(selectinload(User.session))
-    )
-    user = user.scalar()
-    user_session = user.session
-
-    cur_question = await session.execute(
-        select(Question).where(
-            Question.id == user_session.questions_queue[user_session.progress]
-        )
-    )
-    cur_question = cur_question.scalar()
-
-    questions_total = len(user_session.questions_queue)
-
-    previous_message = callback_query.message
-    await bot.delete_message(chat_id=previous_message.chat.id, message_id=previous_message.message_id)
+    cur_question, questions_total = await get_cur_question_with_count(str(callback_query.from_user.id))
+    user = await get_user_with_session(str(callback_query.from_user.id))
+    await delete_msg_handler(callback_query)
     if not callback_query.data.startswith("quiz_init") and not callback_query.data.startswith("quiz_incorrect"):
-        await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_p_msg)
-        await bot.delete_message(chat_id=previous_message.chat.id, message_id=user.session.cur_q_msg)
+        await delete_msg_handler(
+            callback_query,
+            chat_id=callback_query.message.chat.id,
+            message_id=user.session.cur_p_msg
+        )
+        await delete_msg_handler(
+            callback_query,
+            chat_id=callback_query.message.chat.id,
+            message_id=user.session.cur_q_msg
+        )
 
-    answers = []
-    for i, ans in enumerate(cur_question.answers):
-        cur_ans = -1
-        if ans[1] == ')':
-            ans.replace("\n", " ")
-            answers.append(ans.lower())
-            cur_ans += 1
-        else:
-            answers[cur_ans] += (', ' + ans.lower())
-    answers.sort(key=lambda x: x[0])
-    answers_str = html.italic("\n\n".join(answers))
+    answers, answers_str = get_answers_string(cur_question.answers)
+    theme = await get_theme_by_id(user.session.theme_id)
     q_msg = await callback_query.message.answer(
-        f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n\n{html.bold(cur_question.title)}\n\n{answers_str}",
+        f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n\n{html.code(theme.title)}\n\n{html.bold(cur_question.title)}\n\n{answers_str}",
         disable_notification=True,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=HINT + f" ({user.session.hints}/{user.session.hints_total})",
+                    callback_data="hint"
+                )
+            ]
+        ])
+        if user.session.hints > 0
+        else None
     )
 
     p_msg = await callback_query.message.answer_poll(
@@ -483,12 +281,19 @@ async def answer_quiz_handler(
         type="regular",
         allows_multiple_answers=True,
         is_anonymous=False,
-        disable_notification=True,
+        disable_notification=True
     )
 
-    user.session.cur_q_msg = q_msg.message_id
-    user.session.cur_p_msg = p_msg.message_id
-    await session.commit()
+    await save_msg_id(user.telegram_id, q_msg.message_id, "q")
+    await save_msg_id(user.telegram_id, p_msg.message_id, "p")
+
+
+async def hint_requested(callback_query: CallbackQuery) -> None:
+    cur_question, _ = await get_cur_question_with_count(str(callback_query.from_user.id))
+    await callback_query.answer(text=f"📗 Верный ответ: {cur_question.correct_answer.upper()}.\n{NO_MORE_HINTS}", show_alert=True)
+    await decrease_hints(str(callback_query.from_user.id))
+
+    await callback_query.message.edit_reply_markup(reply_markup=None)
 
 
 # noinspection PyTypeChecker
@@ -600,21 +405,38 @@ async def on_poll_answer(
 
 async def delete_msg_handler(
     callback_query: CallbackQuery,
+    chat_id: int | str = None,
+    message_id: int = None
 ):
-    previous_message = callback_query.message
-    await bot.delete_message(
-        chat_id=previous_message.chat.id, message_id=previous_message.message_id
-    )
+    if not chat_id or not message_id:
+        chat_id = callback_query.message.chat.id
+        message_id = callback_query.message.message_id
+    await bot.delete_message(chat_id=chat_id, message_id=message_id)
 
 
-dp.callback_query.register(pet_me_button_handler, lambda c: c.data == "pet")
-dp.callback_query.register(select_theme_handler, lambda c: c.data.startswith("theme"))
-dp.callback_query.register(answer_quiz_handler, lambda c: c.data.startswith("quiz"))
+def get_answers_string(raw_answers: list[str]) -> tuple[list, str]:
+    answers = []
+    for i, ans in enumerate(raw_answers):
+        cur_ans = -1
+        if ans[1] == ')':
+            ans.replace("\n", " ")
+            answers.append(ans.lower())
+            cur_ans += 1
+        else:
+            answers[cur_ans] += (', ' + ans.lower())
+    answers.sort(key=lambda x: x[0])
+    return answers, html.italic("\n\n".join(answers))
+
+
+bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+
+dp.message.outer_middleware(AuthMiddleware())
+dp.callback_query.register(pet_me_button_pressed, lambda c: c.data == "pet")
+dp.callback_query.register(theme_button_pressed, lambda c: c.data.startswith("theme"))
+dp.callback_query.register(quiz_started, lambda c: c.data.startswith("quiz"))
 dp.callback_query.register(delete_msg_handler, lambda c: c.data == "delete")
-dp.callback_query.register(
-    select_section_handler,
-    lambda c: c.data.startswith("section") or c.data.startswith("page"),
-)
+dp.callback_query.register(section_button_pressed, lambda c: c.data.startswith("section") or c.data.startswith("page"))
+dp.callback_query.register(hint_requested, lambda c: c.data.startswith("hint"))
 
 
 async def main() -> None:
