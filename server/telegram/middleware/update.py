@@ -20,7 +20,6 @@ class ChangeLogMiddleware(BaseMiddleware):
 
         if event.from_user:
             user = await get_user(str(event.from_user.id))
-            print('123')
             if not user.checked_update:
                 await event.answer(
                     f"""
