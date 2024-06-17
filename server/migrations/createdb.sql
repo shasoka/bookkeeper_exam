@@ -25,16 +25,25 @@ CREATE TABLE questions (
 
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    telegram_id TEXT
+    telegram_id TEXT,
+    username TEXT,
+    checked_update BOOLEAN DEFAULT false,
+    help_alert_counter INTEGER default 0,
+    themes_done_full integer[] default array []::integer[],
+    themes_done_particular integer[] default array []::integer[]
 );
 
 CREATE TABLE sessions (
     id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP default NOW(),
     user_id INTEGER,
     theme_id INTEGER,
     questions_queue INTEGER[],
     progress INTEGER,
     incorrect_questions INTEGER[],
+    questions_total INTEGER,
+    hints INTEGER,
+    hints_total INTEGER,
     cur_q_msg INTEGER default null,
     cur_p_msg INTEGER default null,
     cur_a_msg INTEGER default null,
@@ -43,9 +52,15 @@ CREATE TABLE sessions (
     FOREIGN KEY (theme_id) REFERENCES themes(id)
 );
 
-INSERT INTO users (telegram_id) VALUES ('401791628');
-INSERT INTO users (telegram_id) VALUES ('760058245');
-INSERT INTO users (telegram_id) VALUES ('768653895');
-INSERT INTO users (telegram_id) VALUES ('1005587901');
-INSERT INTO users (telegram_id) VALUES ('5258574541');
-INSERT INTO users (telegram_id) VALUES ('620396347');
+INSERT INTO users (telegram_id) VALUES ('401791628'),
+                                       ('760058245'),
+                                       ('768653895'),
+                                       ('1005587901'),
+                                       ('5258574541'),
+                                       ('620396347'),
+                                       ('1098632718'),
+                                       ('5428878153'),
+                                       ('1043969446'),
+                                       ('760058245'),
+                                       ('518027491'),
+                                       ('701161572');

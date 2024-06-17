@@ -4,7 +4,7 @@ import random
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message
-from sqlalchemy import select
+from sqlalchemy import select, update, func
 from sqlalchemy.orm import selectinload
 
 from database.connection import SessionLocal
@@ -14,16 +14,78 @@ from database.models import User, UserSession, Theme, Question, Section
 # noinspection PyTypeChecker
 async def get_user(telegram_id: str) -> User:
     async with SessionLocal() as session:
-        user = await session.execute(select(User).where(User.telegram_id == telegram_id))
+        user = await session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
         return user.scalars().first()
 
 
 # noinspection PyTypeChecker
 async def changelog_seen(telegram_id: str) -> None:
     async with SessionLocal() as session:
-        user = await session.execute(select(User).where(User.telegram_id == telegram_id))
+        user = await session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
         user = user.scalars().first()
         user.checked_update = True
+        await session.commit()
+        await session.refresh(user)
+
+
+# noinspection PyTypeChecker
+async def set_username(telegram_id: str, username: str) -> None:
+    async with SessionLocal() as session:
+        user = await session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
+        user = user.scalars().first()
+        user.username = "@" + username
+        await session.commit()
+        await session.refresh(user)
+
+
+# noinspection PyTypeChecker
+async def update_themes_progress(
+    telegram_id: str, theme_id: int, success: bool
+) -> None:
+    async with SessionLocal() as session:
+        user = await session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
+        user = user.scalars().first()
+
+        if theme_id in user.themes_done_full:
+            return
+
+        if success:
+            await session.execute(
+                update(User)
+                .where(User.telegram_id == telegram_id)
+                .values(
+                    themes_done_full=func.array_append(user.themes_done_full, theme_id)
+                )
+            )
+            await session.execute(
+                update(User)
+                .where(User.telegram_id == telegram_id)
+                .values(
+                    themes_done_particular=func.array_remove(
+                        user.themes_done_particular, theme_id
+                    )
+                )
+            )
+        else:
+            if theme_id in user.themes_done_particular:
+                return
+            await session.execute(
+                update(User)
+                .where(User.telegram_id == telegram_id)
+                .values(
+                    themes_done_particular=func.array_append(
+                        user.themes_done_particular, theme_id
+                    )
+                )
+            )
         await session.commit()
         await session.refresh(user)
 
@@ -40,7 +102,19 @@ async def get_user_with_session(telegram_id: str) -> User:
 
 
 # noinspection PyTypeChecker
-async def clear_session(message: Message, bot: Bot):
+async def increase_help_alert_counter(telegram_id: str) -> None:
+    async with SessionLocal() as session:
+        user = await session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
+        user = user.scalars().first()
+        user.help_alert_counter += 1
+        await session.commit()
+        await session.refresh(user)
+
+
+# noinspection PyTypeChecker
+async def clear_session(message: Message, bot: Bot) -> None:
     async with SessionLocal() as session:
         user = await get_user_with_session(str(message.from_user.id))
         user_session = user.session
@@ -53,7 +127,9 @@ async def clear_session(message: Message, bot: Bot):
             ]:
                 if msg:
                     try:
-                        await bot.delete_message(chat_id=message.chat.id, message_id=msg)
+                        await bot.delete_message(
+                            chat_id=message.chat.id, message_id=msg
+                        )
                     except TelegramBadRequest:
                         pass
 
@@ -61,11 +137,8 @@ async def clear_session(message: Message, bot: Bot):
             await session.commit()
 
 
-async def init_session(
-        theme_id: int,
-        telegram_id: str,
-        shuffle: bool
-) -> None:
+# noinspection PyTypeChecker
+async def init_session(theme_id: int, telegram_id: str, shuffle: bool) -> None:
     async with SessionLocal() as session:
         questions, questions_total = await get_questions_with_len_by_theme(theme_id)
 
@@ -90,9 +163,7 @@ async def init_session(
 
 
 # noinspection PyTypeChecker
-async def rerun_session(
-        telegram_id: str
-) -> None:
+async def rerun_session(telegram_id: str) -> None:
     async with SessionLocal() as session:
         user = await session.execute(
             select(User)
@@ -128,11 +199,7 @@ async def decrease_hints(telegram_id: str) -> None:
 
 
 # noinspection PyTypeChecker
-async def save_msg_id(
-        telegram_id: str,
-        msg_id: int,
-        flag: str
-) -> None:
+async def save_msg_id(telegram_id: str, msg_id: int, flag: str) -> None:
     async with SessionLocal() as session:
         user = await session.execute(
             select(User)
@@ -153,9 +220,47 @@ async def save_msg_id(
 
 
 # noinspection PyTypeChecker
+async def increase_progress(telegram_id: str) -> None:
+    async with SessionLocal() as session:
+        user = await session.execute(
+            select(User)
+            .where(User.telegram_id == telegram_id)
+            .options(selectinload(User.session))
+        )
+        user_session = user.scalars().first().session
+        user_session.progress += 1
+        await session.commit()
+        await session.refresh(user_session)
+
+
+# noinspection PyTypeChecker
+async def append_incorrects(telegram_id: str, cur_question_id: int) -> None:
+    async with SessionLocal() as session:
+        user = await session.execute(
+            select(User)
+            .where(User.telegram_id == telegram_id)
+            .options(selectinload(User.session))
+        )
+        user_session = user.scalars().first().session
+        await session.execute(
+            update(UserSession)
+            .where(UserSession.id == user_session.id)
+            .values(
+                incorrect_questions=func.array_append(
+                    user_session.incorrect_questions, cur_question_id
+                )
+            )
+        )
+        await session.commit()
+        await session.refresh(user_session)
+
+
+# noinspection PyTypeChecker
 async def get_questions_with_len_by_theme(theme_id: int) -> tuple[list[Question], int]:
     async with SessionLocal() as session:
-        themes = await session.execute(select(Question).where(Question.theme_id == theme_id))
+        themes = await session.execute(
+            select(Question).where(Question.theme_id == theme_id).order_by(Question.id)
+        )
         themes = themes.scalars().all()
         return themes, len(themes)
 
@@ -165,8 +270,9 @@ async def get_cur_question_with_count(telegram_id: str) -> tuple[Question, int]:
     async with SessionLocal() as session:
         user = await get_user_with_session(telegram_id)
         cur_question = await session.execute(
-            select(Question)
-            .where(Question.id == user.session.questions_queue[user.session.progress])
+            select(Question).where(
+                Question.id == user.session.questions_queue[user.session.progress]
+            )
         )
         cur_question = cur_question.scalars().first()
         return cur_question, len(user.session.questions_queue)
@@ -182,7 +288,9 @@ async def get_sections() -> list[Section]:
 # noinspection PyTypeChecker
 async def get_themes_by_section(section_id: int) -> list[Theme]:
     async with SessionLocal() as session:
-        themes = await session.execute(select(Theme).where(Theme.section_id == section_id))
+        themes = await session.execute(
+            select(Theme).where(Theme.section_id == section_id)
+        )
         return themes.scalars().all()
 
 
