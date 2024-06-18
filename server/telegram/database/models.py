@@ -48,6 +48,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_id: Mapped[str] = mapped_column(nullable=False)
     username: Mapped[str] = mapped_column()
+    hints_allowed: Mapped[bool] = mapped_column(nullable=False, default=True)
     checked_update: Mapped[bool] = mapped_column(nullable=False, default=False)
     help_alert_counter: Mapped[int] = mapped_column(nullable=False, default=0)
     themes_done_full: Mapped[list[int]] = mapped_column(nullable=False, default=[])

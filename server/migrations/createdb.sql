@@ -28,6 +28,7 @@ CREATE TABLE users (
     telegram_id TEXT,
     username TEXT,
     checked_update BOOLEAN DEFAULT false,
+    hints_allowed BOOLEAN DEFAULT true,
     help_alert_counter INTEGER default 0,
     themes_done_full integer[] default array []::integer[],
     themes_done_particular integer[] default array []::integer[]

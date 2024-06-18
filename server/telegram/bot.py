@@ -20,16 +20,18 @@ from aiogram.types import (
 from config import TG_TOKEN as TOKEN
 from middleware.auth_mw import AuthMiddleware
 from middleware.update import ChangeLogMiddleware
-from resources.buttons import DELETE_INLINE_BUTTON
+from resources.reply_markups import DELETE_INLINE_BUTTON, get_hints_button
 from resources.strings import (
     on_quiz_end_success,
     on_section_chosen,
     on_quiz_end_fail,
     on_theme_chosen,
     on_start_msg,
+    CHANGE_HINTS_POLICY_COMMAND,
     SECTIONS_FROM_RESTART,
     SOMETHING_WENT_WRONG,
     SECTIONS_FROM_START,
+    COULDNT_DELETE_MSG,
     SUCCESS_EFFECT_IDS,
     SUCCESS_STATUSES,
     BACK_TO_SECTIONS,
@@ -42,11 +44,12 @@ from resources.strings import (
     LETS_SHUFFLE,
     HEAL_ALERT,
     MARK_THEME,
+    HINTS_OFF,
+    HINTS_ON,
     FORWARD,
     LETS_GO,
     PET_ME,
-    HINT,
-    BACK, COULDNT_DELETE_MSG
+    BACK
 )
 from services.entities_service import (
     get_questions_with_len_by_theme,
@@ -55,6 +58,9 @@ from services.entities_service import (
     update_themes_progress,
     get_themes_by_section,
     get_user_with_session,
+    change_hints_policy,
+    increase_progress,
+    append_incorrects,
     get_theme_by_id,
     decrease_hints,
     clear_session,
@@ -62,7 +68,7 @@ from services.entities_service import (
     get_sections,
     init_session,
     save_msg_id,
-    get_user, increase_progress, append_incorrects
+    get_user,
 )
 from services.quiz_service import parse_answers_from_question, parse_answers_from_poll
 
@@ -107,11 +113,44 @@ async def command_heal_handler(message: Message) -> None:
                 data="quiz_heal",
             )
         )
-    except (AttributeError, IndexError) as _:
+    except (AttributeError, IndexError):
         await message.answer(
             SOMETHING_WENT_WRONG,
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[DELETE_INLINE_BUTTON]]),
         )
+
+
+@dp.message(Command(CHANGE_HINTS_POLICY_COMMAND))
+async def command_change_hints_policy_handler(message: Message) -> None:
+    user = await get_user_with_session(str(message.from_user.id))
+    user_session = user.session
+
+    await message.answer(
+        HINTS_OFF if user.hints_allowed else HINTS_ON,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[DELETE_INLINE_BUTTON]]),
+    )
+    await change_hints_policy(str(message.from_user.id))
+
+    try:
+        if user_session:
+            if not user.hints_allowed:  # Hints allowed
+                if user_session.cur_q_msg and (
+                        not user_session.cur_a_msg or user_session.cur_q_msg > user_session.cur_a_msg
+                ):
+                    await bot.edit_message_reply_markup(
+                        chat_id=int(user.telegram_id),
+                        message_id=user_session.cur_q_msg,
+                        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[get_hints_button(user_session)]]),
+                    )
+            else:  # Hints not allowed
+                if user_session.cur_q_msg:
+                    await bot.edit_message_reply_markup(
+                        chat_id=int(user.telegram_id),
+                        message_id=user_session.cur_q_msg,
+                        reply_markup=None,
+                    )
+    except (TelegramBadRequest, AttributeError):
+        pass
 
 
 # noinspection PyTypeChecker
@@ -398,18 +437,8 @@ async def quiz_started(callback_query: CallbackQuery) -> None:
         f"\n{html.code(theme.title)}\n\n{html.bold(cur_question.title)}\n\n{answers_str}",
         disable_notification=True,
         reply_markup=(
-            InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text=HINT
-                            + f" ({user.session.hints}/{user.session.hints_total})",
-                            callback_data="hint",
-                        )
-                    ]
-                ]
-            )
-            if user.session.hints > 0
+            InlineKeyboardMarkup(inline_keyboard=[[get_hints_button(user.session)]])
+            if user.session.hints > 0 and user.hints_allowed
             else None
         ),
     )
@@ -436,10 +465,13 @@ async def hint_requested(callback_query: CallbackQuery) -> None:
         str(callback_query.from_user.id)
     )
     await callback_query.answer(
-        text=f"📗 Верный ответ: {cur_question.correct_answer.upper()}.\n{NO_MORE_HINTS}",
+        text=f"📗 Один из правильных: {random.choice(cur_question.correct_answer).upper()}.\n{NO_MORE_HINTS}"
+        if len(cur_question.correct_answer) > 1
+        else f"😐 Ты че?\nТут один верный ответ. Сам разбирайся.\n🏳️ Отнимать попытки не стану, ладно.",
         show_alert=True,
     )
-    await decrease_hints(str(callback_query.from_user.id))
+    if len(cur_question.correct_answer) > 1:
+        await decrease_hints(str(callback_query.from_user.id))
 
     await callback_query.message.edit_reply_markup(reply_markup=None)
 
@@ -457,6 +489,16 @@ async def on_poll_answer(
     answers, _ = parse_answers_from_question(cur_question.answers)
     selected_answer = parse_answers_from_poll(answers, poll_answer.option_ids)
     correct_answer = ''.join(sorted(cur_question.correct_answer))
+
+    # Удаление кнопки с подсказкой после выбора ответа
+    try:
+        await bot.edit_message_reply_markup(
+            chat_id=poll_answer.user.id,
+            message_id=user_session.cur_q_msg,
+            reply_markup=None
+        )
+    except TelegramBadRequest:
+        pass
 
     if selected_answer == correct_answer:
         a_msg = await bot.send_message(

@@ -45,6 +45,18 @@ async def set_username(telegram_id: str, username: str) -> None:
 
 
 # noinspection PyTypeChecker
+async def change_hints_policy(telegram_id: str) -> None:
+    async with SessionLocal() as session:
+        user = await session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
+        user = user.scalars().first()
+        user.hints_allowed = not user.hints_allowed
+        await session.commit()
+        await session.refresh(user)
+
+
+# noinspection PyTypeChecker
 async def update_themes_progress(
     telegram_id: str, theme_id: int, success: bool
 ) -> None:
