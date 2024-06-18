@@ -11,14 +11,3 @@ Base = declarative_base()
 
 engine = create_async_engine(DATABASE_URL)
 SessionLocal = async_sessionmaker(engine)
-
-
-async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        await session.close()

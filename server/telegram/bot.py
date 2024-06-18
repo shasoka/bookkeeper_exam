@@ -7,6 +7,7 @@ import sys
 from aiogram import Bot, Dispatcher, html
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart, Command
 from aiogram.types import (
     InlineKeyboardMarkup,
@@ -45,7 +46,7 @@ from resources.strings import (
     LETS_GO,
     PET_ME,
     HINT,
-    BACK
+    BACK, COULDNT_DELETE_MSG
 )
 from services.entities_service import (
     get_questions_with_len_by_theme,
@@ -106,7 +107,7 @@ async def command_heal_handler(message: Message) -> None:
                 data="quiz_heal",
             )
         )
-    except AttributeError:
+    except (AttributeError, IndexError) as _:
         await message.answer(
             SOMETHING_WENT_WRONG,
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[DELETE_INLINE_BUTTON]]),
@@ -378,9 +379,7 @@ async def quiz_started(callback_query: CallbackQuery) -> None:
     user = await get_user_with_session(str(callback_query.from_user.id))
     if not callback_query.data.startswith("quiz_heal"):
         await delete_msg_handler(callback_query)
-    if not callback_query.data.startswith(
-        "quiz_init"
-    ) and not callback_query.data.startswith("quiz_incorrect"):
+    if not callback_query.data.startswith("quiz_init") and not callback_query.data.startswith("quiz_incorrect"):
         await delete_msg_handler(
             callback_query,
             chat_id=callback_query.message.chat.id,
@@ -518,12 +517,20 @@ async def on_poll_answer(
 
 
 async def delete_msg_handler(
-    callback_query: CallbackQuery, chat_id: int | str = None, message_id: int = None
+    callback_query: CallbackQuery,
+    chat_id: int | str = None,
+    message_id: int = None
 ) -> None:
     if not chat_id or not message_id:
         chat_id = callback_query.message.chat.id
         message_id = callback_query.message.message_id
-    await bot.delete_message(chat_id=chat_id, message_id=message_id)
+    try:
+        await bot.delete_message(chat_id=chat_id, message_id=message_id)
+    except TelegramBadRequest:
+        await callback_query.message.answer(
+            text=COULDNT_DELETE_MSG % html.code(str(message_id)),
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[DELETE_INLINE_BUTTON]])
+        )
 
 
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))

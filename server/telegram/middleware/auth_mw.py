@@ -4,6 +4,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
 
 from resources.strings import NOT_AUTHORIZED
+from services.auth_service import transliterate
 from services.entities_service import get_user, set_username
 
 
@@ -30,5 +31,11 @@ class AuthMiddleware(BaseMiddleware):
                 # )
             else:
                 if not user.username:
-                    await set_username(user.telegram_id, event.from_user.username)
+                    if event.from_user.username:
+                        username = event.from_user.username
+                    elif event.from_user.full_name:
+                        username = transliterate(event.from_user.full_name.replace(' ', '_')).lower()
+                    else:
+                        username = str(event.from_user.id)
+                    await set_username(user.telegram_id, username)
                 return await handler(event, data)
