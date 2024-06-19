@@ -67,7 +67,8 @@ class LoggingMiddleware(BaseMiddleware):
         elif isinstance(event, PollAnswer):
             username = LoggingMiddleware.collect_username(event, 'p')
             telegram_id = event.user.id
-            msg = f'[%s] Answer "{''.join(['абвгдежзиклмн'[i] for i in event.option_ids])}" from {event.user.id}@{username} in {timing}'
+            answer = ''.join(['абвгдежзиклмн'[i] for i in event.option_ids])
+            msg = f'[%s] Answer "{answer}" from {event.user.id}@{username} in {timing}'
 
         user = await get_user(str(telegram_id))
         if not user:
