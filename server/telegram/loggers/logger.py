@@ -16,11 +16,11 @@ class CustomFormatter(logging.Formatter):
     MESSAGE_COLOR = '\033[97m'  # White for message
 
     def format(self, record):
-        if 'venv' in (parts := record.pathname.split(os.sep)):
+        if 'telegram' not in (parts := record.pathname.split(os.sep)):
             record.pathname = 'venv'
         else:
-            # src_dir_id = parts.index('telegram')
-            record.pathname = '/'.join(parts[-3:-1])
+            src_dir_id = parts.index('telegram')
+            record.pathname = '/'.join(parts[src_dir_id:-1])
         if record.funcName == '<module>':
             record.funcName = 'root'
         record.name = record.name.split('.')[0]
@@ -42,7 +42,8 @@ class CustomFormatter(logging.Formatter):
 LOGGER: logging.Logger = logging.getLogger()
 
 formatter = CustomFormatter(
-    fmt="%(asctime)s [%(levelname)s:%(name)s] ...%(pathname)s/%(filename)s in %(funcName)s:%(lineno)s %(message)s",
+    # fmt="%(asctime)s [%(levelname)s:%(name)s] ...%(pathname)s/%(filename)s in %(funcName)s:%(lineno)s %(message)s",
+    fmt="[%(levelname)s:%(name)s] ...%(pathname)s/%(filename)s in %(funcName)s:%(lineno)s %(message)s",  # For render
     datefmt="%d.%m %H:%M:%S",
 )
 
@@ -50,7 +51,7 @@ stream_handler = logging.StreamHandler(sys.stdout)
 stream_handler.setFormatter(formatter)
 
 LOGGER.handlers = [stream_handler]
-LOGGER.setLevel(logging.INFO)
+LOGGER.setLevel(logging.DEBUG)
 
 # --- #
 

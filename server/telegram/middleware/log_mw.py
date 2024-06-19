@@ -72,6 +72,6 @@ class LoggingMiddleware(BaseMiddleware):
 
         user = await get_user(str(telegram_id))
         if not user:
-            LOGGER.info(msg % '🔒')
+            LOGGER.debug(msg % '🔒')
         else:
-            LOGGER.info(msg % '🔓')
+            LOGGER.debug(msg % '🔓')

@@ -574,7 +574,7 @@ async def delete_msg_handler(
             f"\n\n{html.code('[' + e.message + ' | (' + str(chat_id) + ';' + str(message_id) + ')]')}",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[DELETE_INLINE_BUTTON]])
         )
-        LOGGER.info("[❌🧹] Couldn't delete msg=%s in chat with user=%s", message_id, chat_id)
+        LOGGER.debug("[❌🧹] Couldn't delete msg=%s in chat with user=%s", message_id, chat_id)
 
 
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
