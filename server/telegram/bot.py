@@ -1,8 +1,6 @@
 import asyncio
 import concurrent.futures
-import logging
 import random
-import sys
 
 from aiogram import Bot, Dispatcher, html
 from aiogram.client.default import DefaultBotProperties
@@ -18,8 +16,10 @@ from aiogram.types import (
 )
 
 from config import TG_TOKEN as TOKEN
+from loggers.logger import LOGGER
 from middleware.auth_mw import AuthMiddleware
-from middleware.update import ChangeLogMiddleware
+from middleware.log_mw import LoggingMiddleware
+from middleware.update_mw import ChangeLogMiddleware
 from resources.reply_markups import DELETE_INLINE_BUTTON, get_hints_button
 from resources.strings import (
     on_quiz_end_success,
@@ -568,17 +568,26 @@ async def delete_msg_handler(
         message_id = callback_query.message.message_id
     try:
         await bot.delete_message(chat_id=chat_id, message_id=message_id)
-    except TelegramBadRequest:
+    except TelegramBadRequest as e:
         await callback_query.message.answer(
-            text=COULDNT_DELETE_MSG % html.code(str(message_id)),
+            text=COULDNT_DELETE_MSG % html.code(str(message_id)) +
+            f"\n\n{html.code('[' + e.message + ' | (' + str(chat_id) + ';' + str(message_id) + ')]')}",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[DELETE_INLINE_BUTTON]])
         )
+        LOGGER.info("[❌🧹] Couldn't delete msg=%s in chat with user=%s", message_id, chat_id)
 
 
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
+for handler in [
+    dp.message,
+    dp.callback_query,
+    dp.poll_answer
+]:
+    handler.outer_middleware(LoggingMiddleware())
 dp.message.outer_middleware(AuthMiddleware())
 dp.message.outer_middleware(ChangeLogMiddleware())
+
 dp.callback_query.register(pet_me_button_pressed, lambda c: c.data == "pet")
 dp.callback_query.register(theme_button_pressed, lambda c: c.data.startswith("theme"))
 dp.callback_query.register(quiz_started, lambda c: c.data.startswith("quiz"))
@@ -595,7 +604,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-
-    # Запуск бота
     asyncio.run(main())
