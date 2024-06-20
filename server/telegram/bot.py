@@ -464,8 +464,12 @@ async def hint_requested(callback_query: CallbackQuery) -> None:
     cur_question, _ = await get_cur_question_with_count(
         str(callback_query.from_user.id)
     )
+
+    answer_len = len(cur_question.correct_answer)
+    hints_will_be_given = answer_len // 2
+    random_hints_ids = random.sample(cur_question.correct_answer.upper(), hints_will_be_given)
     await callback_query.answer(
-        text=f"📗 Один из правильных: {random.choice(cur_question.correct_answer).upper()}.\n{NO_MORE_HINTS}"
+        text=f"🧩 Входит в ответ: {''.join(sorted(random_hints_ids))}.\n🖼 Всего в ответе: {answer_len} буквы\n{NO_MORE_HINTS}"
         if len(cur_question.correct_answer) > 1
         else f"😐 Ты че?\nТут один верный ответ. Сам разбирайся.\n🏳️ Отнимать попытки не стану, ладно.",
         show_alert=True,
