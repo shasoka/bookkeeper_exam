@@ -31,7 +31,7 @@ class ChangeLogMiddleware(BaseMiddleware):
                     \nУспехов! 🤞
                     """,
                     disable_notification=False,
-                    message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
+                    # message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
                 )
                 await changelog_seen(str(event.from_user.id))
                 await asyncio.sleep(5)

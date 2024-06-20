@@ -398,7 +398,7 @@ async def quiz_started(callback_query: CallbackQuery) -> None:
                 if not success
                 else None
             ),
-            message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
+            # message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
             disable_notification=True,
         )
 
@@ -522,7 +522,7 @@ async def on_poll_answer(
                     ]
                 ]
             ),
-            message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
+            # message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
             disable_notification=True,
         )
     else:
