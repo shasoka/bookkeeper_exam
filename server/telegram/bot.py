@@ -19,7 +19,7 @@ from config import TG_TOKEN as TOKEN
 from loggers.logger import LOGGER
 from middleware.auth_mw import AuthMiddleware
 from middleware.log_mw import LoggingMiddleware
-from middleware.update_mw import ChangeLogMiddleware
+from middleware.update_mw import LastChangelogMiddleware
 from resources.reply_markups import DELETE_INLINE_BUTTON, get_hints_button
 from resources.strings import (
     on_quiz_end_success,
@@ -49,7 +49,7 @@ from resources.strings import (
     FORWARD,
     LETS_GO,
     PET_ME,
-    BACK
+    BACK, INVALID_EFFECT_ID
 )
 from services.entities_service import (
     get_questions_with_len_by_theme,
@@ -379,7 +379,8 @@ async def quiz_started(callback_query: CallbackQuery) -> None:
             )
 
         success = True if len(user.session.incorrect_questions) == 0 else False
-        s_msg = await callback_query.message.answer(
+        s_msg = await try_send_msg_with_effect(
+            chat_id=callback_query.message.chat.id,
             text=(
                 on_quiz_end_success(user.session)
                 if success
@@ -398,8 +399,7 @@ async def quiz_started(callback_query: CallbackQuery) -> None:
                 if not success
                 else None
             ),
-            # message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
-            disable_notification=True,
+            message_effect_id=random.choice(SUCCESS_EFFECT_IDS)
         )
 
         _, questions_total = await get_questions_with_len_by_theme(
@@ -501,9 +501,9 @@ async def on_poll_answer(
         pass
 
     if selected_answer == correct_answer:
-        a_msg = await bot.send_message(
-            user.telegram_id,
-            "✅ " + html.bold(random.choice(SUCCESS_STATUSES)),
+        a_msg = await try_send_msg_with_effect(
+            chat_id=user.telegram_id,
+            text="✅ " + html.bold(random.choice(SUCCESS_STATUSES)),
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -522,15 +522,14 @@ async def on_poll_answer(
                     ]
                 ]
             ),
-            # message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
-            disable_notification=True,
+            message_effect_id=random.choice(SUCCESS_EFFECT_IDS)
         )
     else:
-        a_msg = await bot.send_message(
-            user.telegram_id,
-            "❌ " + html.bold(random.choice(FAIL_STATUSES)) + "\n\n❕ "
-            + html.bold("Правильный ответ:") + " "
-            + html.italic(correct_answer),
+        a_msg = await try_send_msg_with_effect(
+            chat_id=user.telegram_id,
+            text="❌ " + html.bold(random.choice(FAIL_STATUSES)) + "\n\n❕ "
+                 + html.bold("Правильный ответ:") + " "
+                 + html.italic(correct_answer),
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -549,8 +548,7 @@ async def on_poll_answer(
                     ]
                 ]
             ),
-            message_effect_id=random.choice(FAIL_EFFECT_IDS),
-            disable_notification=True,
+            message_effect_id=random.choice(FAIL_EFFECT_IDS)
         )
         await append_incorrects(str(poll_answer.user.id), cur_question.id)
 
@@ -577,6 +575,32 @@ async def delete_msg_handler(
         LOGGER.debug("[❌🧹] Couldn't delete msg=%s in chat with user=%s", message_id, chat_id)
 
 
+async def try_send_msg_with_effect(
+        chat_id: int | str,
+        text: str,
+        reply_markup: InlineKeyboardMarkup,
+        message_effect_id: str,
+        disable_notification: bool = True
+) -> Message:
+
+    try:
+        return await bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=reply_markup,
+            message_effect_id=message_effect_id,
+            disable_notification=disable_notification
+        )
+    except TelegramBadRequest:
+        return await bot.send_message(
+            chat_id=chat_id,
+            text=text + INVALID_EFFECT_ID % html.code(message_effect_id),
+            reply_markup=reply_markup,
+            message_effect_id=None,
+            disable_notification=disable_notification
+        )
+
+
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 for handler in [
@@ -586,7 +610,7 @@ for handler in [
 ]:
     handler.outer_middleware(LoggingMiddleware())
 dp.message.outer_middleware(AuthMiddleware())
-dp.message.outer_middleware(ChangeLogMiddleware())
+dp.message.outer_middleware(LastChangelogMiddleware())
 
 dp.callback_query.register(pet_me_button_pressed, lambda c: c.data == "pet")
 dp.callback_query.register(theme_button_pressed, lambda c: c.data.startswith("theme"))

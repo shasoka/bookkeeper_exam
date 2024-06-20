@@ -42,12 +42,12 @@ class LoggingMiddleware(BaseMiddleware):
         te = time()
 
         if (timing := round(te - ts, 5)) >= 5:
-            timing -= 5
+            timing = round(timing - 5, 5)
         LoggingMiddleware.__AVG_TIME_COUNTER += 1
         LoggingMiddleware.__TIMINGS_LIST.append(timing)
 
         if LoggingMiddleware.__AVG_TIME_COUNTER % 25 == 0:
-            LOGGER.info(f'[⏳] Average timing: {sum(LoggingMiddleware.__TIMINGS_LIST) / 25:.5f}')
+            LOGGER.info(f'[⏳] Average timing for 25 last requsts: {sum(LoggingMiddleware.__TIMINGS_LIST) / 25:.5f}')
             LoggingMiddleware.__AVG_TIME_COUNTER = 0
             LoggingMiddleware.__TIMINGS_LIST = []
 
@@ -56,10 +56,13 @@ class LoggingMiddleware(BaseMiddleware):
         if isinstance(event, Message):
             username = LoggingMiddleware.collect_username(event, 'm')
             telegram_id = event.from_user.id
-            if '/' in event.text:
-                msg = f'[%s] Command "{event.text}" from {event.from_user.id}@{username} in {timing}'
+            if event.text:
+                if '/' in event.text:
+                    msg = f'[%s] Command "{event.text}" from {event.from_user.id}@{username} in {timing}'
+                else:
+                    msg = f'[%s] Message "{event.text}" from {event.from_user.id}@{username} in {timing}'
             else:
-                msg = f'[%s] Message "{event.text}" from {event.from_user.id}@{username} in {timing}'
+                msg = f'[%s] Message "<non_text_data>" from {event.from_user.id}@{username} in {timing}'
         elif isinstance(event, CallbackQuery):
             username = LoggingMiddleware.collect_username(event, 'q')
             telegram_id = event.from_user.id
