@@ -212,6 +212,8 @@ async def section_button_pressed(callback_query: CallbackQuery) -> None:
         if theme.id in user.themes_done_full:
             marker = "🟢"
         elif theme.id in user.themes_done_particular:
+            marker = "🟡"
+        elif theme.id in user.themes_tried:
             marker = "🟠"
         else:
             marker = "🔴"
@@ -378,12 +380,12 @@ async def quiz_started(callback_query: CallbackQuery) -> None:
                 message_id=msg_id,
             )
 
-        success = True if len(user.session.incorrect_questions) == 0 else False
+        without_mistakes = True if len(user.session.incorrect_questions) == 0 else False
         s_msg = await try_send_msg_with_effect(
             chat_id=callback_query.message.chat.id,
             text=(
                 on_quiz_end_success(user.session)
-                if success
+                if without_mistakes
                 else on_quiz_end_fail(user.session)
             ),
             reply_markup=(
@@ -396,19 +398,22 @@ async def quiz_started(callback_query: CallbackQuery) -> None:
                         ]
                     ]
                 )
-                if not success
+                if not without_mistakes
                 else None
             ),
             message_effect_id=random.choice(SUCCESS_EFFECT_IDS)
         )
 
-        _, questions_total = await get_questions_with_len_by_theme(
-            user.session.theme_id
-        )
-        if questions_total == user.session.questions_total:
-            await update_themes_progress(
-                user.telegram_id, user.session.theme_id, success
-            )
+        _, questions_total = await get_questions_with_len_by_theme(user.session.theme_id)
+        if without_mistakes:
+            # Если тест пройден без ошибок, то нужно проверить ситуацию пройден ли он без исправления ошибок
+            if questions_total == user.session.questions_total:
+                # Если кол-во вопросов в сессии равно кол-ву вопросов в выбранной теме, вешаем "зеленый" маркер
+                await update_themes_progress(user.telegram_id, user.session.theme_id, without_mistakes)
+            else:
+                # Если кол-во вопросов в сессии НЕ равно кол-ву вопросов в выбранной теме, вешаем "желтый" маркер
+                await update_themes_progress(user.telegram_id, user.session.theme_id, not without_mistakes)
+
         await save_msg_id(user.telegram_id, s_msg.message_id, "s")
         return
 
@@ -432,6 +437,8 @@ async def quiz_started(callback_query: CallbackQuery) -> None:
 
     answers, answers_str = parse_answers_from_question(cur_question.answers)
     theme = await get_theme_by_id(user.session.theme_id)
+    if user.session.theme_id not in user.themes_done_full + user.themes_tried + user.themes_done_particular:
+        await update_themes_progress(user.telegram_id, user.session.theme_id, None)
     q_msg = await callback_query.message.answer(
         f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n"
         f"\n{html.code(theme.title)}\n\n{html.bold(cur_question.title)}\n\n{answers_str}",

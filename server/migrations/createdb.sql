@@ -30,6 +30,7 @@ CREATE TABLE users (
     checked_update BOOLEAN DEFAULT false,
     hints_allowed BOOLEAN DEFAULT true,
     help_alert_counter INTEGER default 0,
+    themes_tried integer[] default array []::integer[],
     themes_done_full integer[] default array []::integer[],
     themes_done_particular integer[] default array []::integer[]
 );

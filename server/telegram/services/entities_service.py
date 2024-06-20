@@ -58,7 +58,7 @@ async def change_hints_policy(telegram_id: str) -> None:
 
 # noinspection PyTypeChecker
 async def update_themes_progress(
-    telegram_id: str, theme_id: int, success: bool
+    telegram_id: str, theme_id: int, success: bool | None
 ) -> None:
     async with SessionLocal() as session:
         user = await session.execute(
@@ -69,34 +69,59 @@ async def update_themes_progress(
         if theme_id in user.themes_done_full:
             return
 
-        if success:
-            await session.execute(
-                update(User)
-                .where(User.telegram_id == telegram_id)
-                .values(
-                    themes_done_full=func.array_append(user.themes_done_full, theme_id)
-                )
-            )
-            await session.execute(
-                update(User)
-                .where(User.telegram_id == telegram_id)
-                .values(
-                    themes_done_particular=func.array_remove(
-                        user.themes_done_particular, theme_id
+        if isinstance(success, bool):
+            if success:
+                await session.execute(
+                    update(User)
+                    .where(User.telegram_id == telegram_id)
+                    .values(
+                        themes_done_full=func.array_append(user.themes_done_full, theme_id)
                     )
                 )
-            )
+                await session.execute(
+                    update(User)
+                    .where(User.telegram_id == telegram_id)
+                    .values(
+                        themes_done_particular=func.array_remove(
+                            user.themes_done_particular, theme_id
+                        )
+                    )
+                )
+                await session.execute(
+                    update(User)
+                    .where(User.telegram_id == telegram_id)
+                    .values(
+                        themes_tried=func.array_remove(
+                            user.themes_tried, theme_id
+                        )
+                    )
+                )
+            else:
+                if theme_id in user.themes_done_particular:
+                    return
+                await session.execute(
+                    update(User)
+                    .where(User.telegram_id == telegram_id)
+                    .values(
+                        themes_done_particular=func.array_append(
+                            user.themes_done_particular, theme_id
+                        )
+                    )
+                )
+                await session.execute(
+                    update(User)
+                    .where(User.telegram_id == telegram_id)
+                    .values(
+                        themes_tried=func.array_remove(
+                            user.themes_tried, theme_id
+                        )
+                    )
+                )
         else:
-            if theme_id in user.themes_done_particular:
-                return
             await session.execute(
                 update(User)
                 .where(User.telegram_id == telegram_id)
-                .values(
-                    themes_done_particular=func.array_append(
-                        user.themes_done_particular, theme_id
-                    )
-                )
+                .values(themes_tried=func.array_append(user.themes_tried, theme_id))
             )
         await session.commit()
         await session.refresh(user)

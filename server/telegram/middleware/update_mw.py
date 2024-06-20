@@ -4,7 +4,7 @@ from typing import Callable, Any, Awaitable
 
 from aiogram import BaseMiddleware, html
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import TelegramObject
+from aiogram.types import TelegramObject, LinkPreviewOptions
 
 from resources.strings import SUCCESS_EFFECT_IDS, CHANGELOGS, INVALID_EFFECT_ID
 from services.entities_service import get_user, changelog_seen
@@ -27,11 +27,13 @@ class LastChangelogMiddleware(BaseMiddleware):
                     await event.answer(
                         CHANGELOGS[-1],
                         disable_notification=False,
+                        link_preview_options=LinkPreviewOptions(is_disabled=True),
                         message_effect_id=effect_id,
                     )
                 except TelegramBadRequest:
                     await event.answer(
                         CHANGELOGS[-1] + INVALID_EFFECT_ID % html.code(effect_id),
+                        link_preview_options=LinkPreviewOptions(is_disabled=True),
                         disable_notification=False,
                     )
                 await changelog_seen(str(event.from_user.id))

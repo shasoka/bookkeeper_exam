@@ -51,6 +51,7 @@ class User(Base):
     hints_allowed: Mapped[bool] = mapped_column(nullable=False, default=True)
     checked_update: Mapped[bool] = mapped_column(nullable=False, default=False)
     help_alert_counter: Mapped[int] = mapped_column(nullable=False, default=0)
+    themes_tried: Mapped[list[int]] = mapped_column(nullable=False, default=[])
     themes_done_full: Mapped[list[int]] = mapped_column(nullable=False, default=[])
     themes_done_particular: Mapped[list[int]] = mapped_column(
         nullable=False, default=[]
