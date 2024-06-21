@@ -16,17 +16,21 @@ class LoggingMiddleware(BaseMiddleware):
     @staticmethod
     def m_q_username(event: Message | CallbackQuery | PollAnswer) -> str:
         if not (username := event.from_user.username):
-            username = transliterate(event.from_user.full_name.replace(' ', '_')).lower()
+            username = transliterate(
+                event.from_user.full_name.replace(" ", "_")
+            ).lower()
         return username
 
     @staticmethod
     def collect_username(event: Message | CallbackQuery | PollAnswer, flag: str) -> str:
         match flag:
-            case 'm' | 'q':
+            case "m" | "q":
                 return LoggingMiddleware.m_q_username(event)
-            case 'p':
+            case "p":
                 if not (username := event.user.username):
-                    username = transliterate(event.user.full_name.replace(' ', '_')).lower()
+                    username = transliterate(
+                        event.user.full_name.replace(" ", "_")
+                    ).lower()
                 return username
 
     # noinspection PyTypeChecker
@@ -47,34 +51,36 @@ class LoggingMiddleware(BaseMiddleware):
         LoggingMiddleware.__TIMINGS_LIST.append(timing)
 
         if LoggingMiddleware.__AVG_TIME_COUNTER % 25 == 0:
-            LOGGER.info(f'[⏳] Average timing for 25 last requsts: {sum(LoggingMiddleware.__TIMINGS_LIST) / 25:.5f}')
+            LOGGER.info(
+                f"[⏳] Average timing for 25 last requsts: {sum(LoggingMiddleware.__TIMINGS_LIST) / 25:.5f}"
+            )
             LoggingMiddleware.__AVG_TIME_COUNTER = 0
             LoggingMiddleware.__TIMINGS_LIST = []
 
-        telegram_id = '<unknown_id>'
-        msg = f'Unknown event from %s in {te - ts}'
+        telegram_id = "<unknown_id>"
+        msg = f"Unknown event from %s in {te - ts}"
         if isinstance(event, Message):
-            username = LoggingMiddleware.collect_username(event, 'm')
+            username = LoggingMiddleware.collect_username(event, "m")
             telegram_id = event.from_user.id
             if event.text:
-                if '/' in event.text:
+                if "/" in event.text:
                     msg = f'[%s] Command "{event.text}" from {event.from_user.id}@{username} in {timing}'
                 else:
                     msg = f'[%s] Message "{event.text}" from {event.from_user.id}@{username} in {timing}'
             else:
                 msg = f'[%s] Message "<non_text_data>" from {event.from_user.id}@{username} in {timing}'
         elif isinstance(event, CallbackQuery):
-            username = LoggingMiddleware.collect_username(event, 'q')
+            username = LoggingMiddleware.collect_username(event, "q")
             telegram_id = event.from_user.id
             msg = f'[%s] Callback "{event.data}" from {event.from_user.id}@{username} in {timing}'
         elif isinstance(event, PollAnswer):
-            username = LoggingMiddleware.collect_username(event, 'p')
+            username = LoggingMiddleware.collect_username(event, "p")
             telegram_id = event.user.id
-            answer = ''.join(['абвгдежзиклмн'[i] for i in event.option_ids])
+            answer = "".join(["абвгдежзиклмн"[i] for i in event.option_ids])
             msg = f'[%s] Answer "{answer}" from {event.user.id}@{username} in {timing}'
 
         user = await get_user(str(telegram_id))
         if not user:
-            LOGGER.debug(msg % '🔒')
+            LOGGER.debug(msg % "🔒")
         else:
-            LOGGER.debug(msg % '🔓')
+            LOGGER.debug(msg % "🔓")

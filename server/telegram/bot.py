@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import random
+from datetime import datetime, timedelta, UTC
 
 from aiogram import Bot, Dispatcher, html
 from aiogram.client.default import DefaultBotProperties
@@ -20,6 +21,7 @@ from loggers.logger import LOGGER
 from middleware.auth_mw import AuthMiddleware
 from middleware.log_mw import LoggingMiddleware
 from middleware.update_mw import LastChangelogMiddleware
+from resources.coroutines import DURATION, TASKS
 from resources.reply_markups import DELETE_INLINE_BUTTON, get_hints_button
 from resources.strings import (
     on_quiz_end_success,
@@ -49,7 +51,11 @@ from resources.strings import (
     FORWARD,
     LETS_GO,
     PET_ME,
-    BACK, INVALID_EFFECT_ID
+    BACK,
+    INVALID_EFFECT_ID,
+    EXAM_COMMAND,
+    EXAM_MESSAGE,
+    on_exam_end,
 )
 from services.entities_service import (
     get_questions_with_len_by_theme,
@@ -69,6 +75,8 @@ from services.entities_service import (
     init_session,
     save_msg_id,
     get_user,
+    init_exam_session,
+    update_user_exam_best,
 )
 from services.quiz_service import parse_answers_from_question, parse_answers_from_poll
 
@@ -94,6 +102,24 @@ async def command_start_handler(message: Message) -> None:
     )
 
 
+@dp.message(Command(EXAM_COMMAND))
+async def command_exam_handler(message: Message) -> None:
+    await clear_session(message, bot)
+
+    user = await get_user(str(message.from_user.id))
+
+    await message.answer(
+        text=EXAM_MESSAGE % html.code(str(user.exam_best) + "/35"),
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="⚔️", callback_data="exam_init")],
+                [DELETE_INLINE_BUTTON],
+            ]
+        ),
+        disable_notification=True,
+    )
+
+
 # noinspection PyTypeChecker
 @dp.message(Command(RESTART_COMMAND))
 async def command_restart_handler(message: Message) -> None:
@@ -104,15 +130,28 @@ async def command_restart_handler(message: Message) -> None:
 @dp.message(Command(HEAL_COMMAND))
 async def command_heal_handler(message: Message) -> None:
     try:
-        return await quiz_started(
-            CallbackQuery(
-                id=str(message.message_id),
-                from_user=message.from_user,
-                chat_instance=str(message.chat.id),
-                message=message,
-                data="quiz_heal",
+        user = await get_user_with_session(str(message.from_user.id))
+        user_session = user.session
+        if user_session.theme_id is not None:
+            return await quiz(
+                CallbackQuery(
+                    id=str(message.message_id),
+                    from_user=message.from_user,
+                    chat_instance=str(message.chat.id),
+                    message=message,
+                    data="quiz_heal",
+                )
             )
-        )
+        else:
+            return await exam(
+                CallbackQuery(
+                    id=str(message.message_id),
+                    from_user=message.from_user,
+                    chat_instance=str(message.chat.id),
+                    message=message,
+                    data="exam_heal",
+                )
+            )
     except (AttributeError, IndexError):
         await message.answer(
             SOMETHING_WENT_WRONG,
@@ -135,12 +174,15 @@ async def command_change_hints_policy_handler(message: Message) -> None:
         if user_session:
             if not user.hints_allowed:  # Hints allowed
                 if user_session.cur_q_msg and (
-                        not user_session.cur_a_msg or user_session.cur_q_msg > user_session.cur_a_msg
+                    not user_session.cur_a_msg
+                    or user_session.cur_q_msg > user_session.cur_a_msg
                 ):
                     await bot.edit_message_reply_markup(
                         chat_id=int(user.telegram_id),
                         message_id=user_session.cur_q_msg,
-                        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[get_hints_button(user_session)]]),
+                        reply_markup=InlineKeyboardMarkup(
+                            inline_keyboard=[[get_hints_button(user_session)]]
+                        ),
                     )
             else:  # Hints not allowed
                 if user_session.cur_q_msg:
@@ -338,7 +380,7 @@ async def mark_theme_as_done(callback_query: CallbackQuery) -> None:
     await callback_query.answer("✅")
 
     new_markup = callback_query.message.reply_markup
-    new_markup.inline_keyboard[0] = [
+    new_markup.inline_keyboard[2] = [
         InlineKeyboardButton(
             text=BACK_TO_THEMES + " ◀️", callback_data="section_" + section
         )
@@ -346,8 +388,149 @@ async def mark_theme_as_done(callback_query: CallbackQuery) -> None:
     await callback_query.message.edit_reply_markup(reply_markup=new_markup)
 
 
+# noinspection PyAsyncCall
+async def exam(callback_query: CallbackQuery) -> None:
+    telegram_id = str(callback_query.from_user.id)
+
+    if callback_query.data.startswith("exam_init"):
+        await increase_help_alert_counter(telegram_id)
+
+        user = await get_user(telegram_id)
+
+        await init_exam_session(telegram_id)
+
+        if user.help_alert_counter % 10 == 0:
+            await callback_query.answer(
+                text=HEAL_ALERT, show_alert=True, disable_notification=False
+            )
+
+        end_time = datetime.now(UTC) + timedelta(minutes=DURATION)
+        TASKS[telegram_id] = (
+            asyncio.create_task(
+                handle_exam_timeout(callback_query, telegram_id, end_time)
+            ),
+            end_time,
+        )
+
+    if callback_query.data.startswith("exam_end"):
+        user = await get_user_with_session(telegram_id)
+        to_delete = [
+            user.session.cur_a_msg,
+            user.session.cur_p_msg,
+            user.session.cur_q_msg,
+        ]
+        for i, msg in enumerate(to_delete):
+            if msg is not None:
+                await delete_msg_handler(
+                    callback_query,
+                    chat_id=callback_query.message.chat.id,
+                    message_id=msg,
+                )
+                await save_msg_id(user.telegram_id, None, "apq"[i])
+
+        score = user.session.progress - len(user.session.incorrect_questions)
+
+        if "timeout" not in callback_query.data:
+            msg_text = on_exam_end(score > user.exam_best, score)
+        else:
+            msg_text = (
+                html.code("[ВРЕМЯ ВЫШЛО]")
+                + "\n\n"
+                + on_exam_end(score > user.exam_best, score).strip()
+            )
+        cur_task = TASKS.pop(telegram_id)
+        cur_task[0].cancel()
+        s_msg = await try_send_msg_with_effect(
+            chat_id=callback_query.message.chat.id,
+            text=msg_text,
+            reply_markup=(
+                InlineKeyboardMarkup(inline_keyboard=[[DELETE_INLINE_BUTTON]])
+            ),
+            message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
+        )
+
+        await update_user_exam_best(telegram_id, score)
+        await save_msg_id(user.telegram_id, s_msg.message_id, "s")
+        return
+
+    if (TASKS[telegram_id][1] - datetime.now(UTC)).total_seconds() > 2:
+        await save_msg_id(telegram_id, None, "a")
+
+        cur_question, questions_total = await get_cur_question_with_count(telegram_id)
+        user = await get_user_with_session(telegram_id)
+
+        if (user.session.progress + 1) % 5 == 0:
+            delta = int((TASKS[telegram_id][1] - datetime.now(UTC)).total_seconds())
+            minutes, seconds = divmod(delta, 60)
+            await callback_query.answer(
+                text=f"⌛️ {minutes:02d}:{seconds:02d}",
+                show_alert=False,
+                disable_notification=True,
+            )
+
+        if not callback_query.data.startswith("exam_heal"):
+            await delete_msg_handler(callback_query)
+        if not callback_query.data.startswith("exam_init"):
+            to_delete = [user.session.cur_p_msg, user.session.cur_q_msg]
+            for i, msg in enumerate(to_delete):
+                if msg is not None:
+                    await delete_msg_handler(
+                        callback_query,
+                        chat_id=callback_query.message.chat.id,
+                        message_id=msg,
+                    )
+                    await save_msg_id(user.telegram_id, None, "pq"[i])
+
+        answers, answers_str = parse_answers_from_question(cur_question.answers)
+        q_msg = await callback_query.message.answer(
+            f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n"
+            f"\n{html.code('Это экзамен, братуха 🥶')}\n\n{html.bold(cur_question.title)}\n\n{answers_str}",
+            disable_notification=True,
+        )
+
+        p_msg = await callback_query.message.answer_poll(
+            question=(
+                f"Выбери {html.bold('верный')} ответ"
+                if len(cur_question.correct_answer) == 1
+                else f"Выбери {html.bold('верные')} ответы"
+            ),
+            options=[ans.lower()[:2] for ans in answers],
+            type="regular",
+            allows_multiple_answers=True,
+            is_anonymous=False,
+            disable_notification=True,
+        )
+
+        await save_msg_id(user.telegram_id, q_msg.message_id, "q")
+        await save_msg_id(user.telegram_id, p_msg.message_id, "p")
+
+
+async def handle_exam_timeout(
+    callback_query: CallbackQuery, telegram_id, end_time
+) -> None:
+    time_remaining = (end_time - datetime.now(UTC)).total_seconds()
+    await callback_query.answer(
+        text="⌛️ Время пошло", show_alert=False, disable_notification=True
+    )
+    await asyncio.sleep(time_remaining)
+
+    user = await get_user_with_session(telegram_id)
+    user_session = user.session
+
+    if user_session and user_session.progress < 35 and datetime.now(UTC) >= end_time:
+        return await exam(
+            CallbackQuery(
+                id=callback_query.id,
+                from_user=callback_query.from_user,
+                chat_instance=callback_query.chat_instance,
+                message=callback_query.message,
+                data="exam_end_timeout",
+            )
+        )
+
+
 # noinspection PyTypeChecker
-async def quiz_started(callback_query: CallbackQuery) -> None:
+async def quiz(callback_query: CallbackQuery) -> None:
     if callback_query.data.startswith("quiz_init"):
         await increase_help_alert_counter(str(callback_query.from_user.id))
 
@@ -369,16 +552,19 @@ async def quiz_started(callback_query: CallbackQuery) -> None:
 
     if callback_query.data.startswith("quiz_end"):
         user = await get_user_with_session(str(callback_query.from_user.id))
-        for msg_id in [
-            callback_query.message.message_id,
+        to_delete = [
+            user.session.cur_a_msg,
             user.session.cur_p_msg,
             user.session.cur_q_msg,
-        ]:
-            await delete_msg_handler(
-                callback_query,
-                chat_id=callback_query.message.chat.id,
-                message_id=msg_id,
-            )
+        ]
+        for i, msg in enumerate(to_delete):
+            if msg is not None:
+                await delete_msg_handler(
+                    callback_query,
+                    chat_id=callback_query.message.chat.id,
+                    message_id=msg,
+                )
+                await save_msg_id(user.telegram_id, None, "apq"[i])
 
         without_mistakes = True if len(user.session.incorrect_questions) == 0 else False
         s_msg = await try_send_msg_with_effect(
@@ -395,24 +581,31 @@ async def quiz_started(callback_query: CallbackQuery) -> None:
                             InlineKeyboardButton(
                                 text="🧩", callback_data="quiz_incorrect"
                             )
-                        ]
+                        ],
+                        [DELETE_INLINE_BUTTON],
                     ]
                 )
                 if not without_mistakes
-                else None
+                else InlineKeyboardMarkup(inline_keyboard=[[DELETE_INLINE_BUTTON]])
             ),
-            message_effect_id=random.choice(SUCCESS_EFFECT_IDS)
+            message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
         )
 
-        _, questions_total = await get_questions_with_len_by_theme(user.session.theme_id)
+        _, questions_total = await get_questions_with_len_by_theme(
+            user.session.theme_id
+        )
         if without_mistakes:
             # Если тест пройден без ошибок, то нужно проверить ситуацию пройден ли он без исправления ошибок
             if questions_total == user.session.questions_total:
                 # Если кол-во вопросов в сессии равно кол-ву вопросов в выбранной теме, вешаем "зеленый" маркер
-                await update_themes_progress(user.telegram_id, user.session.theme_id, without_mistakes)
+                await update_themes_progress(
+                    user.telegram_id, user.session.theme_id, without_mistakes
+                )
             else:
                 # Если кол-во вопросов в сессии НЕ равно кол-ву вопросов в выбранной теме, вешаем "желтый" маркер
-                await update_themes_progress(user.telegram_id, user.session.theme_id, not without_mistakes)
+                await update_themes_progress(
+                    user.telegram_id, user.session.theme_id, not without_mistakes
+                )
 
         await save_msg_id(user.telegram_id, s_msg.message_id, "s")
         return
@@ -423,21 +616,25 @@ async def quiz_started(callback_query: CallbackQuery) -> None:
     user = await get_user_with_session(str(callback_query.from_user.id))
     if not callback_query.data.startswith("quiz_heal"):
         await delete_msg_handler(callback_query)
-    if not callback_query.data.startswith("quiz_init") and not callback_query.data.startswith("quiz_incorrect"):
-        await delete_msg_handler(
-            callback_query,
-            chat_id=callback_query.message.chat.id,
-            message_id=user.session.cur_p_msg,
-        )
-        await delete_msg_handler(
-            callback_query,
-            chat_id=callback_query.message.chat.id,
-            message_id=user.session.cur_q_msg,
-        )
+    if not callback_query.data.startswith(
+        "quiz_init"
+    ) and not callback_query.data.startswith("quiz_incorrect"):
+        to_delete = [user.session.cur_p_msg, user.session.cur_q_msg]
+        for i, msg in enumerate(to_delete):
+            if msg is not None:
+                await delete_msg_handler(
+                    callback_query,
+                    chat_id=callback_query.message.chat.id,
+                    message_id=msg,
+                )
+                await save_msg_id(user.telegram_id, None, "pq"[i])
 
     answers, answers_str = parse_answers_from_question(cur_question.answers)
     theme = await get_theme_by_id(user.session.theme_id)
-    if user.session.theme_id not in user.themes_done_full + user.themes_tried + user.themes_done_particular:
+    if (
+        user.session.theme_id
+        not in user.themes_done_full + user.themes_tried + user.themes_done_particular
+    ):
         await update_themes_progress(user.telegram_id, user.session.theme_id, None)
     q_msg = await callback_query.message.answer(
         f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n"
@@ -474,11 +671,15 @@ async def hint_requested(callback_query: CallbackQuery) -> None:
 
     answer_len = len(cur_question.correct_answer)
     hints_will_be_given = answer_len // 2
-    random_hints_ids = random.sample(cur_question.correct_answer.upper(), hints_will_be_given)
+    random_hints_ids = random.sample(
+        cur_question.correct_answer.upper(), hints_will_be_given
+    )
     await callback_query.answer(
-        text=f"🧩 Входит в ответ: {''.join(sorted(random_hints_ids))}.\n🖼 Всего в ответе: {answer_len} буквы\n{NO_MORE_HINTS}"
-        if len(cur_question.correct_answer) > 1
-        else f"😐 Ты че?\nТут один верный ответ. Сам разбирайся.\n🏳️ Отнимать попытки не стану, ладно.",
+        text=(
+            f"🧩 Входит в ответ: {''.join(sorted(random_hints_ids))}.\n🖼 Всего в ответе: {answer_len} буквы\n{NO_MORE_HINTS}"
+            if len(cur_question.correct_answer) > 1
+            else f"😐 Ты че?\nТут один верный ответ. Сам разбирайся.\n🏳️ Отнимать попытки не стану, ладно."
+        ),
         show_alert=True,
     )
     if len(cur_question.correct_answer) > 1:
@@ -489,27 +690,38 @@ async def hint_requested(callback_query: CallbackQuery) -> None:
 
 # noinspection PyTypeChecker
 @dp.poll_answer()
-async def on_poll_answer(
-    poll_answer: PollAnswer
-):
+async def on_poll_answer(poll_answer: PollAnswer):
     user = await get_user_with_session(str(poll_answer.user.id))
     user_session = user.session
 
-    cur_question, questions_total = await get_cur_question_with_count(str(poll_answer.user.id))
+    cur_question, questions_total = await get_cur_question_with_count(
+        str(poll_answer.user.id)
+    )
 
     answers, _ = parse_answers_from_question(cur_question.answers)
     selected_answer = parse_answers_from_poll(answers, poll_answer.option_ids)
-    correct_answer = ''.join(sorted(cur_question.correct_answer))
+    correct_answer = "".join(sorted(cur_question.correct_answer))
 
     # Удаление кнопки с подсказкой после выбора ответа
     try:
         await bot.edit_message_reply_markup(
             chat_id=poll_answer.user.id,
             message_id=user_session.cur_q_msg,
-            reply_markup=None
+            reply_markup=None,
         )
     except TelegramBadRequest:
         pass
+
+    if user_session.theme_id is not None:
+        if user_session.progress < questions_total - 1:
+            callback_data = "quiz"
+        else:
+            callback_data = "quiz_end"
+    else:
+        if user_session.progress < questions_total - 1:
+            callback_data = "exam"
+        else:
+            callback_data = "exam_end"
 
     if selected_answer == correct_answer:
         a_msg = await try_send_msg_with_effect(
@@ -524,23 +736,22 @@ async def on_poll_answer(
                                 if user_session.progress < questions_total - 1
                                 else "🏁"
                             ),
-                            callback_data=(
-                                "quiz"
-                                if user_session.progress < questions_total - 1
-                                else "quiz_end"
-                            ),
+                            callback_data=callback_data,
                         )
                     ]
                 ]
             ),
-            message_effect_id=random.choice(SUCCESS_EFFECT_IDS)
+            message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
         )
     else:
         a_msg = await try_send_msg_with_effect(
             chat_id=user.telegram_id,
-            text="❌ " + html.bold(random.choice(FAIL_STATUSES)) + "\n\n❕ "
-                 + html.bold("Правильный ответ:") + " "
-                 + html.italic(correct_answer),
+            text="❌ "
+            + html.bold(random.choice(FAIL_STATUSES))
+            + "\n\n❕ "
+            + html.bold("Правильный ответ:")
+            + " "
+            + html.italic(correct_answer),
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -550,16 +761,12 @@ async def on_poll_answer(
                                 if user_session.progress < questions_total - 1
                                 else "🏁"
                             ),
-                            callback_data=(
-                                "quiz"
-                                if user_session.progress < questions_total - 1
-                                else "quiz_end"
-                            ),
+                            callback_data=callback_data,
                         )
                     ]
                 ]
             ),
-            message_effect_id=random.choice(FAIL_EFFECT_IDS)
+            message_effect_id=random.choice(FAIL_EFFECT_IDS),
         )
         await append_incorrects(str(poll_answer.user.id), cur_question.id)
 
@@ -568,9 +775,7 @@ async def on_poll_answer(
 
 
 async def delete_msg_handler(
-    callback_query: CallbackQuery,
-    chat_id: int | str = None,
-    message_id: int = None
+    callback_query: CallbackQuery, chat_id: int | str = None, message_id: int = None
 ) -> None:
     if not chat_id or not message_id:
         chat_id = callback_query.message.chat.id
@@ -578,20 +783,28 @@ async def delete_msg_handler(
     try:
         await bot.delete_message(chat_id=chat_id, message_id=message_id)
     except TelegramBadRequest as e:
-        await callback_query.message.answer(
-            text=COULDNT_DELETE_MSG % html.code(str(message_id)) +
-            f"\n\n{html.code('[' + e.message + ' | (' + str(chat_id) + ';' + str(message_id) + ')]')}",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[DELETE_INLINE_BUTTON]])
-        )
-        LOGGER.debug("[❌🧹] Couldn't delete msg=%s in chat with user=%s", message_id, chat_id)
+        if isinstance(callback_query.message, Message):
+            await bot.send_message(
+                chat_id=chat_id,
+                text=COULDNT_DELETE_MSG % html.code(str(message_id))
+                + f"\n\n{html.code('[' + e.message + ' | (' + str(chat_id) + ';' + str(message_id) + ')]')}",
+                reply_markup=InlineKeyboardMarkup(
+                    inline_keyboard=[[DELETE_INLINE_BUTTON]]
+                ),
+            )
+            LOGGER.debug(
+                "[❌🧹] Couldn't delete msg=%s in chat with user=%s",
+                message_id,
+                chat_id,
+            )
 
 
 async def try_send_msg_with_effect(
-        chat_id: int | str,
-        text: str,
-        reply_markup: InlineKeyboardMarkup,
-        message_effect_id: str,
-        disable_notification: bool = True
+    chat_id: int | str,
+    text: str,
+    reply_markup: InlineKeyboardMarkup,
+    message_effect_id: str,
+    disable_notification: bool = True,
 ) -> Message:
 
     try:
@@ -600,7 +813,7 @@ async def try_send_msg_with_effect(
             text=text,
             reply_markup=reply_markup,
             message_effect_id=message_effect_id,
-            disable_notification=disable_notification
+            disable_notification=disable_notification,
         )
     except TelegramBadRequest:
         return await bot.send_message(
@@ -608,28 +821,30 @@ async def try_send_msg_with_effect(
             text=text + INVALID_EFFECT_ID % html.code(message_effect_id),
             reply_markup=reply_markup,
             message_effect_id=None,
-            disable_notification=disable_notification
+            disable_notification=disable_notification,
         )
 
 
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
-for handler in [
-    dp.message,
-    dp.callback_query,
-    dp.poll_answer
-]:
+for handler in [dp.message, dp.callback_query, dp.poll_answer]:
     handler.outer_middleware(LoggingMiddleware())
 dp.message.outer_middleware(AuthMiddleware())
 dp.message.outer_middleware(LastChangelogMiddleware())
 
 dp.callback_query.register(pet_me_button_pressed, lambda c: c.data == "pet")
 dp.callback_query.register(theme_button_pressed, lambda c: c.data.startswith("theme"))
-dp.callback_query.register(quiz_started, lambda c: c.data.startswith("quiz"))
+dp.callback_query.register(quiz, lambda c: c.data.startswith("quiz"))
+dp.callback_query.register(exam, lambda c: c.data.startswith("exam"))
 dp.callback_query.register(delete_msg_handler, lambda c: c.data == "delete")
-dp.callback_query.register(section_button_pressed, lambda c: c.data.startswith("section") or c.data.startswith("page"))
+dp.callback_query.register(
+    section_button_pressed,
+    lambda c: c.data.startswith("section") or c.data.startswith("page"),
+)
 dp.callback_query.register(hint_requested, lambda c: c.data.startswith("hint"))
-dp.callback_query.register(mark_theme_as_done, lambda c: c.data.startswith("mark_theme_"))
+dp.callback_query.register(
+    mark_theme_as_done, lambda c: c.data.startswith("mark_theme_")
+)
 
 
 async def main() -> None:

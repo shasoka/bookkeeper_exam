@@ -75,7 +75,9 @@ async def update_themes_progress(
                     update(User)
                     .where(User.telegram_id == telegram_id)
                     .values(
-                        themes_done_full=func.array_append(user.themes_done_full, theme_id)
+                        themes_done_full=func.array_append(
+                            user.themes_done_full, theme_id
+                        )
                     )
                 )
                 await session.execute(
@@ -90,11 +92,7 @@ async def update_themes_progress(
                 await session.execute(
                     update(User)
                     .where(User.telegram_id == telegram_id)
-                    .values(
-                        themes_tried=func.array_remove(
-                            user.themes_tried, theme_id
-                        )
-                    )
+                    .values(themes_tried=func.array_remove(user.themes_tried, theme_id))
                 )
             else:
                 if theme_id in user.themes_done_particular:
@@ -111,11 +109,7 @@ async def update_themes_progress(
                 await session.execute(
                     update(User)
                     .where(User.telegram_id == telegram_id)
-                    .values(
-                        themes_tried=func.array_remove(
-                            user.themes_tried, theme_id
-                        )
-                    )
+                    .values(themes_tried=func.array_remove(user.themes_tried, theme_id))
                 )
         else:
             await session.execute(
@@ -172,6 +166,44 @@ async def clear_session(message: Message, bot: Bot) -> None:
 
             await session.delete(user_session)
             await session.commit()
+
+
+async def init_exam_session(telegram_id: str) -> None:
+    async with SessionLocal() as session:
+        questions_collection = await session.execute(select(Question))
+        questions_collection = questions_collection.scalars().all()
+
+        questions_queue = random.sample([q.id for q in questions_collection], 35)
+
+        user = await get_user(telegram_id)
+
+        new_session = UserSession(
+            user_id=user.id,
+            incorrect_questions=[],
+            questions_queue=questions_queue,
+            questions_total=35,
+            hints=0,
+            hints_total=0,
+            progress=0,
+        )
+        session.add(new_session)
+        await session.commit()
+        await session.refresh(new_session)
+
+
+# noinspection PyTypeChecker
+async def update_user_exam_best(telegram_id: str, score: int) -> None:
+    async with SessionLocal() as session:
+        user = await session.execute(
+            select(User).where(User.telegram_id == telegram_id)
+        )
+        user = user.scalars().first()
+        if score > user.exam_best:
+            user.exam_best = score
+            await session.commit()
+            await session.refresh(user)
+        else:
+            return
 
 
 # noinspection PyTypeChecker
@@ -236,7 +268,7 @@ async def decrease_hints(telegram_id: str) -> None:
 
 
 # noinspection PyTypeChecker
-async def save_msg_id(telegram_id: str, msg_id: int, flag: str) -> None:
+async def save_msg_id(telegram_id: str, msg_id: int | None, flag: str) -> None:
     async with SessionLocal() as session:
         user = await session.execute(
             select(User)

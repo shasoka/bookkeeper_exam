@@ -34,7 +34,9 @@ class AuthMiddleware(BaseMiddleware):
                     if event.from_user.username:
                         username = event.from_user.username
                     elif event.from_user.full_name:
-                        username = transliterate(event.from_user.full_name.replace(' ', '_')).lower()
+                        username = transliterate(
+                            event.from_user.full_name.replace(" ", "_")
+                        ).lower()
                     else:
                         username = str(event.from_user.id)
                     await set_username(user.telegram_id, username)

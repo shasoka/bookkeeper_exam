@@ -27,6 +27,7 @@ CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     telegram_id TEXT,
     username TEXT,
+    exam_best INTEGER default 0,
     checked_update BOOLEAN DEFAULT false,
     hints_allowed BOOLEAN DEFAULT true,
     help_alert_counter INTEGER default 0,
