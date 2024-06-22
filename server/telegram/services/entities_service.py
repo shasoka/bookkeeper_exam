@@ -3,7 +3,7 @@ import random
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from sqlalchemy import select, update, func
 from sqlalchemy.orm import selectinload
 
@@ -145,7 +145,7 @@ async def increase_help_alert_counter(telegram_id: str) -> None:
 
 
 # noinspection PyTypeChecker
-async def clear_session(message: Message, bot: Bot) -> None:
+async def clear_session(message: Message | CallbackQuery, bot: Bot) -> None:
     async with SessionLocal() as session:
         user = await get_user_with_session(str(message.from_user.id))
         user_session = user.session
@@ -159,7 +159,10 @@ async def clear_session(message: Message, bot: Bot) -> None:
                 if msg:
                     try:
                         await bot.delete_message(
-                            chat_id=message.chat.id, message_id=msg
+                            chat_id=message.chat.id
+                            if isinstance(message, Message)
+                            else message.message.chat.id,
+                            message_id=msg
                         )
                     except TelegramBadRequest:
                         pass
@@ -168,14 +171,16 @@ async def clear_session(message: Message, bot: Bot) -> None:
             await session.commit()
 
 
-async def init_exam_session(telegram_id: str) -> None:
+async def init_exam_session(telegram_id: str) -> bool:
     async with SessionLocal() as session:
+        user = await get_user_with_session(telegram_id)
+        if user.session is not None:
+            return False
+
         questions_collection = await session.execute(select(Question))
         questions_collection = questions_collection.scalars().all()
 
         questions_queue = random.sample([q.id for q in questions_collection], 35)
-
-        user = await get_user(telegram_id)
 
         new_session = UserSession(
             user_id=user.id,
@@ -189,6 +194,7 @@ async def init_exam_session(telegram_id: str) -> None:
         session.add(new_session)
         await session.commit()
         await session.refresh(new_session)
+        return True
 
 
 # noinspection PyTypeChecker
@@ -207,14 +213,16 @@ async def update_user_exam_best(telegram_id: str, score: int) -> None:
 
 
 # noinspection PyTypeChecker
-async def init_session(theme_id: int, telegram_id: str, shuffle: bool) -> None:
+async def init_session(theme_id: int, telegram_id: str, shuffle: bool) -> bool:
     async with SessionLocal() as session:
+        user = await get_user_with_session(telegram_id)
+        if user.session is not None:
+            return False
+
         questions, questions_total = await get_questions_with_len_by_theme(theme_id)
 
         if shuffle:
             random.shuffle(questions)
-
-        user = await get_user(telegram_id)
 
         new_session = UserSession(
             user_id=user.id,
@@ -229,6 +237,7 @@ async def init_session(theme_id: int, telegram_id: str, shuffle: bool) -> None:
         session.add(new_session)
         await session.commit()
         await session.refresh(new_session)
+        return True
 
 
 # noinspection PyTypeChecker

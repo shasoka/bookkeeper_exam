@@ -1,7 +1,15 @@
+"""
+Main module. Contains an entry point of the app.
+
+Here the dispatcher and the bot are instantiated. Polling runs with :code:`concurrent.futures.ProcessPoolExecutor()`.
+"""
+
+
 import asyncio
 import concurrent.futures
 import random
 from datetime import datetime, timedelta, UTC
+from typing import Coroutine, Any
 
 from aiogram import Bot, Dispatcher, html
 from aiogram.client.default import DefaultBotProperties
@@ -29,12 +37,14 @@ from resources.strings import (
     on_quiz_end_fail,
     on_theme_chosen,
     on_start_msg,
+    on_exam_end,
     CHANGE_HINTS_POLICY_COMMAND,
     SECTIONS_FROM_RESTART,
     SOMETHING_WENT_WRONG,
     SECTIONS_FROM_START,
     COULDNT_DELETE_MSG,
     SUCCESS_EFFECT_IDS,
+    INVALID_EFFECT_ID,
     SUCCESS_STATUSES,
     BACK_TO_SECTIONS,
     FAIL_EFFECT_IDS,
@@ -44,6 +54,8 @@ from resources.strings import (
     FAIL_STATUSES,
     HEAL_COMMAND,
     LETS_SHUFFLE,
+    EXAM_COMMAND,
+    EXAM_MESSAGE,
     HEAL_ALERT,
     MARK_THEME,
     HINTS_OFF,
@@ -51,11 +63,7 @@ from resources.strings import (
     FORWARD,
     LETS_GO,
     PET_ME,
-    BACK,
-    INVALID_EFFECT_ID,
-    EXAM_COMMAND,
-    EXAM_MESSAGE,
-    on_exam_end,
+    BACK, SESSION_CREATING_DELAY, SESSION_CREATED,
 )
 from services.entities_service import (
     get_questions_with_len_by_theme,
@@ -64,9 +72,11 @@ from services.entities_service import (
     update_themes_progress,
     get_themes_by_section,
     get_user_with_session,
+    update_user_exam_best,
     change_hints_policy,
     increase_progress,
     append_incorrects,
+    init_exam_session,
     get_theme_by_id,
     decrease_hints,
     clear_session,
@@ -74,18 +84,32 @@ from services.entities_service import (
     get_sections,
     init_session,
     save_msg_id,
-    get_user,
-    init_exam_session,
-    update_user_exam_best,
+    get_user
 )
 from services.quiz_service import parse_answers_from_question, parse_answers_from_poll
 
-dp = Dispatcher()
+
+dp: Dispatcher = Dispatcher()
+"""*Module-scoped*. Aiogram Dispatcher object (root router)"""
 
 
 # noinspection PyTypeChecker
 @dp.message(CommandStart())
-async def command_start_handler(message: Message) -> None:
+async def command_start_handler(message: Message) -> Coroutine[Any, Any, None]:
+    """
+    Handler for incoming :code:`/start` command.
+
+    It awaits user's session clearing (if any exists) and sends back new on-start-message::code:`aiogram.Message`
+    with inline keyboard.
+
+    :param message: incoming Telegram message from user
+    :return: :code:`None`
+    """
+
+    # 1. Any - type of values that the coro can yield
+    # 2. Any - type of values that the coro can accept
+    # 3. None - type of expecting return of the coro
+
     await clear_session(message, bot)
 
     keyboard = InlineKeyboardMarkup(
@@ -102,13 +126,25 @@ async def command_start_handler(message: Message) -> None:
     )
 
 
+# noinspection PyTypeChecker
 @dp.message(Command(EXAM_COMMAND))
-async def command_exam_handler(message: Message) -> None:
+async def command_exam_handler(message: Message) -> Coroutine[Any, Any, None]:
+    """
+    Handler for incoming :code:`/exam` command.
+
+    It awaits user's session clearing (if any exists) and sends back new pre-exam-message::code:`aiogram.Message`
+    with inline keyboard.
+
+    :param message: incoming Telegram message from user
+    :return: :code:`None`
+    """
+
     await clear_session(message, bot)
 
     user = await get_user(str(message.from_user.id))
 
     await message.answer(
+        # There are always 35 questions in the exam session
         text=EXAM_MESSAGE % html.code(str(user.exam_best) + "/35"),
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
@@ -122,13 +158,34 @@ async def command_exam_handler(message: Message) -> None:
 
 # noinspection PyTypeChecker
 @dp.message(Command(RESTART_COMMAND))
-async def command_restart_handler(message: Message) -> None:
+async def command_restart_handler(message: Message) -> Coroutine[Any, Any, None]:
+    """
+    Handler for incoming :code:`/restart` command.
+
+    It awaits user's session clearing (if any exists) and calls back to state, where user can choose section.
+
+    :param message: incoming Telegram message from user
+    :return: :code:`None`
+    """
+
     await clear_session(message, bot)
+    # Imitating the same behaviour as when user pressed the "pet_me" button
     await pet_me_button_pressed(callback_query=message)
 
 
+# noinspection PyTypeChecker
 @dp.message(Command(HEAL_COMMAND))
-async def command_heal_handler(message: Message) -> None:
+async def command_heal_handler(message: Message) -> Coroutine[Any, Any, None]:
+    """
+    Handler for incoming :code:`/heal` command.
+
+    It tries to await user's session clearing (if any exists) and sends back new heal-message::code:`aiogram.Message`
+    with inline keyboard. On successful try the message
+
+    :param message: incoming Telegram message from user
+    :return: :code:`None`
+    """
+
     try:
         user = await get_user_with_session(str(message.from_user.id))
         user_session = user.session
@@ -159,8 +216,9 @@ async def command_heal_handler(message: Message) -> None:
         )
 
 
+# noinspection PyTypeChecker
 @dp.message(Command(CHANGE_HINTS_POLICY_COMMAND))
-async def command_change_hints_policy_handler(message: Message) -> None:
+async def command_change_hints_policy_handler(message: Message) -> Coroutine[Any, Any, None]:
     user = await get_user_with_session(str(message.from_user.id))
     user_session = user.session
 
@@ -397,7 +455,16 @@ async def exam(callback_query: CallbackQuery) -> None:
 
         user = await get_user(telegram_id)
 
-        await init_exam_session(telegram_id)
+        alive_sessions = True
+        while not await init_exam_session(telegram_id):
+            if alive_sessions:
+                await callback_query.answer(
+                    text=SESSION_CREATING_DELAY % "Запускаю таймер! ⏳",
+                    show_alert=False,
+                    disable_notification=False,
+                )
+                alive_sessions = False
+            await clear_session(callback_query, bot)
 
         if user.help_alert_counter % 10 == 0:
             await callback_query.answer(
@@ -510,7 +577,7 @@ async def handle_exam_timeout(
 ) -> None:
     time_remaining = (end_time - datetime.now(UTC)).total_seconds()
     await callback_query.answer(
-        text="⌛️ Время пошло", show_alert=False, disable_notification=True
+        text="⏳ Время пошло", show_alert=False, disable_notification=True
     )
     await asyncio.sleep(time_remaining)
 
@@ -529,17 +596,35 @@ async def handle_exam_timeout(
         )
 
 
-# noinspection PyTypeChecker
+# noinspection PyTypeChecker,PyAsyncCall
 async def quiz(callback_query: CallbackQuery) -> None:
+    telegram_id: str = str(callback_query.from_user.id)
+
     if callback_query.data.startswith("quiz_init"):
-        await increase_help_alert_counter(str(callback_query.from_user.id))
+        await increase_help_alert_counter(telegram_id)
 
-        user = await get_user(str(callback_query.from_user.id))
+        user = await get_user(telegram_id)
 
-        await init_session(
+        alive_sessions = True
+        while not await init_session(
             theme_id=int(callback_query.data.split("_")[-1]),
-            telegram_id=str(callback_query.from_user.id),
+            telegram_id=telegram_id,
             shuffle=True if "shuffle" in callback_query.data else False,
+        ):
+            if alive_sessions:
+                await callback_query.answer(
+                    text=SESSION_CREATING_DELAY % "Создаю для тебя новую! 📒",
+                    show_alert=False,
+                    disable_notification=False,
+                    cache_time=5
+                )
+                alive_sessions = False
+            await clear_session(callback_query, bot)
+
+        await callback_query.answer(
+            text=SESSION_CREATED,
+            show_alert=False,
+            disable_notification=False,
         )
 
         if user.help_alert_counter % 10 == 0:
@@ -548,10 +633,10 @@ async def quiz(callback_query: CallbackQuery) -> None:
             )
 
     if callback_query.data.startswith("quiz_incorrect"):
-        await rerun_session(telegram_id=str(callback_query.from_user.id))
+        await rerun_session(telegram_id)
 
     if callback_query.data.startswith("quiz_end"):
-        user = await get_user_with_session(str(callback_query.from_user.id))
+        user = await get_user_with_session(telegram_id)
         to_delete = [
             user.session.cur_a_msg,
             user.session.cur_p_msg,
@@ -609,6 +694,8 @@ async def quiz(callback_query: CallbackQuery) -> None:
 
         await save_msg_id(user.telegram_id, s_msg.message_id, "s")
         return
+
+    await save_msg_id(str(callback_query.from_user.id), None, "a")
 
     cur_question, questions_total = await get_cur_question_with_count(
         str(callback_query.from_user.id)
