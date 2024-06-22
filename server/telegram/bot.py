@@ -549,13 +549,15 @@ async def exam(callback_query: CallbackQuery) -> None:
                     await save_msg_id(user.telegram_id, None, "pq"[i])
 
         answers, answers_str = parse_answers_from_question(cur_question.answers)
-        q_msg = await callback_query.message.answer(
-            f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n"
-            f"\n{html.code('Это экзамен, братуха 🥶')}\n\n{html.bold(cur_question.title)}\n\n{answers_str}",
+        q_msg = await bot.send_message(
+            chat_id=callback_query.message.chat.id,
+            text=f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n"
+                 f"\n{html.code('Это экзамен, братуха 🥶')}\n\n{html.bold(cur_question.title)}\n\n{answers_str}",
             disable_notification=True,
         )
 
-        p_msg = await callback_query.message.answer_poll(
+        p_msg = await bot.send_poll(
+            chat_id=callback_query.message.chat.id,
             question=(
                 f"Выбери {html.bold('верный')} ответ"
                 if len(cur_question.correct_answer) == 1
@@ -695,12 +697,10 @@ async def quiz(callback_query: CallbackQuery) -> None:
         await save_msg_id(user.telegram_id, s_msg.message_id, "s")
         return
 
-    await save_msg_id(str(callback_query.from_user.id), None, "a")
+    await save_msg_id(telegram_id, None, "a")
 
-    cur_question, questions_total = await get_cur_question_with_count(
-        str(callback_query.from_user.id)
-    )
-    user = await get_user_with_session(str(callback_query.from_user.id))
+    cur_question, questions_total = await get_cur_question_with_count(telegram_id)
+    user = await get_user_with_session(telegram_id)
     if not callback_query.data.startswith("quiz_heal"):
         await delete_msg_handler(callback_query)
     if not callback_query.data.startswith(
@@ -723,9 +723,10 @@ async def quiz(callback_query: CallbackQuery) -> None:
         not in user.themes_done_full + user.themes_tried + user.themes_done_particular
     ):
         await update_themes_progress(user.telegram_id, user.session.theme_id, None)
-    q_msg = await callback_query.message.answer(
-        f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n"
-        f"\n{html.code(theme.title)}\n\n{html.bold(cur_question.title)}\n\n{answers_str}",
+    q_msg = await bot.send_message(
+        chat_id=callback_query.message.chat.id,
+        text=f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n"
+             f"\n{html.code(theme.title)}\n\n{html.bold(cur_question.title)}\n\n{answers_str}",
         disable_notification=True,
         reply_markup=(
             InlineKeyboardMarkup(inline_keyboard=[[get_hints_button(user.session)]])
@@ -734,7 +735,8 @@ async def quiz(callback_query: CallbackQuery) -> None:
         ),
     )
 
-    p_msg = await callback_query.message.answer_poll(
+    p_msg = await bot.send_poll(
+        chat_id=callback_query.message.chat.id,
         question=(
             f"Выбери {html.bold('верный')} ответ"
             if len(cur_question.correct_answer) == 1
