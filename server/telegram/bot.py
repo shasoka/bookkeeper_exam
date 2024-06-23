@@ -23,8 +23,10 @@ from aiogram.types import (
     PollAnswer,
     Message,
 )
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiohttp import web
 
-from config import TG_TOKEN as TOKEN
+from config import TG_TOKEN as TOKEN, BASE_WEBHOOK_URL, WEBHOOK_PATH, WEBHOOK_SECRET, WEB_SERVER_PORT, WEB_SERVER_HOST
 from loggers.logger import LOGGER
 from middleware.auth_mw import AuthMiddleware
 from middleware.log_mw import LoggingMiddleware
@@ -936,11 +938,36 @@ dp.callback_query.register(
 )
 
 
-async def main() -> None:
+async def on_startup(bot: Bot) -> None:
+    await bot.set_webhook(
+        url=f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}",
+        secret_token=WEBHOOK_SECRET
+    )
+
+
+# async def main() -> None:
+def main() -> None:
+    dp.startup.register(on_startup)
+
+    app = web.Application()
+
+    webhook_requests_handler = SimpleRequestHandler(
+        dispatcher=dp,
+        bot=bot,
+        secret_token=WEBHOOK_SECRET,
+    )
+    # Register webhook handler on application
+    webhook_requests_handler.register(app, path=WEBHOOK_PATH)
+
+    # Mount dispatcher startup and shutdown hooks to aiohttp application
+    setup_application(app, dp, bot=bot)
+
     # Run in a custom process pool to prevent IO blocking
     with concurrent.futures.ProcessPoolExecutor() as _:
-        await dp.start_polling(bot)
+        # await dp.start_polling(bot)
+        web.run_app(app, host=WEB_SERVER_HOST, port=WEB_SERVER_PORT)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # asyncio.run(main())
+    main()

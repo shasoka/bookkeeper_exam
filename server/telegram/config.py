@@ -12,5 +12,14 @@ DB_NAME: Final[str] = os.environ.get("DB_NAME")
 DB_USER: Final[str] = os.environ.get("DB_USER")
 DB_PASS: Final[str] = os.environ.get("DB_PASS")
 
+# Constants for WebApp server
+WEB_SERVER_HOST: Final[str] = os.environ.get("WEB_SERVER_HOST")
+WEB_SERVER_PORT: Final[int] = int(os.environ.get("WEB_SERVER_PORT"))
+
+# Constants for Webhook
+WEBHOOK_PATH: Final[str] = os.environ.get("WEBHOOK_PATH")
+WEBHOOK_SECRET: Final[str] = os.environ.get("WEBHOOK_SECRET")
+BASE_WEBHOOK_URL: Final[str] = os.environ.get("BASE_WEBHOOK_URL")
+
 # Константы конфигурации для бота
 TG_TOKEN: Final[str] = os.environ.get("TG_TOKEN")
