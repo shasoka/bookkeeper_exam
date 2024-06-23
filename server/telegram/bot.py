@@ -209,7 +209,7 @@ async def command_heal_handler(message: Message) -> Coroutine[Any, Any, None]:
                     data="exam_heal",
                 )
             )
-    except (AttributeError, IndexError):
+    except (AttributeError, IndexError, KeyError):
         await message.answer(
             SOMETHING_WENT_WRONG,
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[DELETE_INLINE_BUTTON]]),

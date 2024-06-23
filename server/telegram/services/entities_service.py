@@ -284,7 +284,12 @@ async def save_msg_id(telegram_id: str, msg_id: int | None, flag: str) -> None:
             .where(User.telegram_id == telegram_id)
             .options(selectinload(User.session))
         )
-        user_session = user.scalars().first().session
+        user = user.scalars().first()
+        user_session = user.session
+
+        if user_session is None:
+            return
+
         match flag:
             case "q":
                 user_session.cur_q_msg = msg_id
