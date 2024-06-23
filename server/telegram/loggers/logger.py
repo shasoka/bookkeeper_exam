@@ -1,9 +1,6 @@
 import logging
 import os
 import sys
-# import warnings
-
-# from sqlalchemy import exc as sa_exc
 
 
 class CustomFormatter(logging.Formatter):
@@ -53,8 +50,9 @@ class CustomFormatter(logging.Formatter):
         return msg
 
 
-# logging.getLogger('sqlalchemy').setLevel(logging.ERROR)
-# warnings.filterwarnings('ignore', category=sa_exc.SAWarning, message="Multiple rows returned with uselist=False")
+logging.getLogger('sqlalchemy').setLevel(logging.WARN)
+logging.getLogger('aiohttp').setLevel(logging.WARN)
+logging.getLogger('aiogram').setLevel(logging.WARN)
 
 LOGGER: logging.Logger = logging.getLogger()
 
