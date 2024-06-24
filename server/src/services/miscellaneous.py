@@ -1,5 +1,3 @@
-from typing import Any
-
 from aiogram import html
 
 
@@ -77,7 +75,7 @@ def transliterate(text):
     return translit_text
 
 
-def parse_answers_from_question(raw_answers: dict[str, Any]) -> tuple[list[str], str]:
+def parse_answers_from_question(raw_answers: list[str]) -> tuple[list[str], str]:
     answers = []
     for i, ans in enumerate(raw_answers):
         cur_ans = -1

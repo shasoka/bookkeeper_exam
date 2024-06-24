@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from database.connection import SessionLocal
 from database.models import User, UserSession, Theme, Question, Section
+from services.miscellaneous import parse_answers_from_question
 
 
 # noinspection PyTypeChecker
@@ -187,7 +188,9 @@ async def init_exam_session(telegram_id: str) -> bool:
         # Выбираем по одному вопросу из каждой темы
         for theme in themes:
             if theme.questions:
-                selected_questions.append(random.choice(theme.questions))
+                randomed_q = random.choice(theme.questions)
+                if len(parse_answers_from_question(randomed_q.answers)[0]) <= 4:
+                    selected_questions.append(randomed_q)
 
         # Проверка, если у нас меньше 35 вопросов
         num_remaining_questions = 35 - len(selected_questions)
@@ -195,7 +198,7 @@ async def init_exam_session(telegram_id: str) -> bool:
             # Получаем все вопросы, которые еще не были выбраны
             all_questions = await session.execute(select(Question))
             all_questions = all_questions.scalars().all()
-            remaining_questions = [q for q in all_questions if q not in selected_questions]
+            remaining_questions = [q for q in all_questions if q not in selected_questions and len(parse_answers_from_question(q.answers)[0]) <= 4]
 
             # Выбираем случайным образом оставшиеся вопросы
             selected_questions.extend(random.sample(remaining_questions, num_remaining_questions))
