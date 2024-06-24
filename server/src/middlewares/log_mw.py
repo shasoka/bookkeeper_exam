@@ -4,7 +4,7 @@ from typing import Callable, Any, Awaitable
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Message, CallbackQuery, PollAnswer
 
-from logger import LOGGER
+from loggers.logger import LOGGER
 from services.miscellaneous import transliterate
 from services.entities_service import get_user
 

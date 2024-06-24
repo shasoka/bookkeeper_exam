@@ -27,7 +27,7 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 from aiohttp import web
 
 from config import TG_TOKEN as TOKEN, BASE_WEBHOOK_URL, WEBHOOK_PATH, WEBHOOK_SECRET, WEB_SERVER_PORT, WEB_SERVER_HOST
-from logger import LOGGER
+from loggers.logger import LOGGER
 from middlewares.auth_mw import AuthMiddleware
 from middlewares.log_mw import LoggingMiddleware
 from middlewares.update_mw import LastChangelogMiddleware
@@ -947,7 +947,6 @@ async def on_startup(bot: Bot) -> None:
     )
 
 
-# async def main() -> None:
 def main() -> None:
     dp.startup.register(on_startup)
 
@@ -966,10 +965,10 @@ def main() -> None:
 
     # Run in a custom process pool to prevent IO blocking
     with concurrent.futures.ProcessPoolExecutor() as _:
-        # await dp.start_polling(bot)
+        # await dp.start_polling(bot)  # For long-polling mode
         web.run_app(app, host=WEB_SERVER_HOST, port=WEB_SERVER_PORT)
 
 
 if __name__ == "__main__":
-    # asyncio.run(main())
+    # asyncio.run(main())  # For long-polling mode
     main()
