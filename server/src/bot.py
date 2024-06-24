@@ -524,9 +524,10 @@ async def exam(callback_query: CallbackQuery) -> None:
 
     if telegram_id not in TASKS:
         callback_query.answer(
-            text="🫥 Кажется твоя экзаменационная сессия сломалась.\n😓К сожалению я не смогу восстановить таймер, а вместе с ним и саму сессию, т.к. таймер хранится в оперативной памяти а не в базе данных. Скорее всего мне пришлось перезагрузиться из-за обновления\n\n🔄 /exam",
-            show_alert=True
+            text="🫥 Кажется твоя экзаменационная сессия сломалась",
+            show_alert=False
         )
+        return
 
     if (TASKS[telegram_id][1] - datetime.now(UTC)).total_seconds() > 2:
         await save_msg_id(telegram_id, None, "a")
@@ -706,10 +707,17 @@ async def quiz(callback_query: CallbackQuery) -> None:
         await save_msg_id(user.telegram_id, s_msg.message_id, "s")
         return
 
+    user = await get_user_with_session(telegram_id)
+    if user.session.questions_queue == user.session.progress:
+        callback_query.answer(
+            text="🫥 Кажется твоя сессия сломалась",
+            show_alert=False
+        )
+        return
+
     await save_msg_id(telegram_id, None, "a")
 
     cur_question, questions_total = await get_cur_question_with_count(telegram_id)
-    user = await get_user_with_session(telegram_id)
     if not callback_query.data.startswith("quiz_heal"):
         await delete_msg_handler(callback_query)
     if not callback_query.data.startswith(

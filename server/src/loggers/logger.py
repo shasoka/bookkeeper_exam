@@ -26,7 +26,7 @@ class CustomFormatter(logging.Formatter):
             + str(record.lineno)
         )
 
-        if "telegram" not in (parts := record.pathname.split(os.sep)):
+        if "src" not in (parts := record.pathname.split(os.sep)):
             record.pathname = "venv"
         else:
             src_dir_id = parts.index("telegram")
