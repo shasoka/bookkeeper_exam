@@ -177,10 +177,34 @@ async def init_exam_session(telegram_id: str) -> bool:
         if user.session is not None:
             return False
 
-        questions_collection = await session.execute(select(Question))
-        questions_collection = questions_collection.scalars().all()
+        # Получаем все темы с загруженными вопросами
+        themes = await session.execute(select(Theme).options(selectinload(Theme.questions)))
+        themes = themes.scalars().all()
 
-        questions_queue = random.sample([q.id for q in questions_collection], 35)
+        # Список для хранения выбранных вопросов
+        selected_questions = []
+
+        # Выбираем по одному вопросу из каждой темы
+        for theme in themes:
+            if theme.questions:
+                selected_questions.append(random.choice(theme.questions))
+
+        # Проверка, если у нас меньше 35 вопросов
+        num_remaining_questions = 35 - len(selected_questions)
+        if num_remaining_questions > 0:
+            # Получаем все вопросы, которые еще не были выбраны
+            all_questions = await session.execute(select(Question))
+            all_questions = all_questions.scalars().all()
+            remaining_questions = [q for q in all_questions if q not in selected_questions]
+
+            # Выбираем случайным образом оставшиеся вопросы
+            selected_questions.extend(random.sample(remaining_questions, num_remaining_questions))
+
+        # Перемешиваем вопросы
+        random.shuffle(selected_questions)
+
+        # Создаем очередь вопросов для сессии
+        questions_queue = [q.id for q in selected_questions]
 
         new_session = UserSession(
             user_id=user.id,
@@ -341,11 +365,13 @@ async def append_incorrects(telegram_id: str, cur_question_id: int) -> None:
 # noinspection PyTypeChecker
 async def get_questions_with_len_by_theme(theme_id: int) -> tuple[list[Question], int]:
     async with SessionLocal() as session:
-        themes = await session.execute(
-            select(Question).where(Question.theme_id == theme_id).order_by(Question.id)
+        questions = await session.execute(
+            select(Question)
+            .where(Question.theme_id == theme_id)
+            .order_by(Question.id)
         )
-        themes = themes.scalars().all()
-        return themes, len(themes)
+        questions = questions.scalars().all()
+        return questions, len(questions)
 
 
 # noinspection PyTypeChecker
@@ -353,9 +379,9 @@ async def get_cur_question_with_count(telegram_id: str) -> tuple[Question, int]:
     async with SessionLocal() as session:
         user = await get_user_with_session(telegram_id)
         cur_question = await session.execute(
-            select(Question).where(
-                Question.id == user.session.questions_queue[user.session.progress]
-            )
+            select(Question)
+            .where(Question.id == user.session.questions_queue[user.session.progress])
+            .options(selectinload(Question.theme))
         )
         cur_question = cur_question.scalars().first()
         return cur_question, len(user.session.questions_queue)

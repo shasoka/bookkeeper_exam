@@ -29,6 +29,7 @@ class Theme(Base):
 
     section: Mapped["Section"] = relationship("Section", back_populates="themes")
     session: Mapped["UserSession"] = relationship("UserSession", back_populates="theme")
+    questions: Mapped[list["Question"]] = relationship("Question", back_populates="theme")
 
 
 class Question(Base):
@@ -40,6 +41,8 @@ class Question(Base):
     correct_answer: Mapped[str] = mapped_column(nullable=False)
 
     theme_id: Mapped[int] = mapped_column(ForeignKey("themes.id"))
+
+    theme: Mapped["Theme"] = relationship("Theme", back_populates="questions")
 
 
 class User(Base):

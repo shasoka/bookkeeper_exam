@@ -553,7 +553,7 @@ async def exam(callback_query: CallbackQuery) -> None:
         answers, answers_str = parse_answers_from_question(cur_question.answers)
         q_msg = await bot.send_message(
             chat_id=callback_query.message.chat.id,
-            text=f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n"
+            text=f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n{html.code(f'{cur_question.theme.title}')}"
                  f"\n{html.code('Это экзамен, братуха 🥶')}\n\n{html.bold(cur_question.title)}\n\n{answers_str}",
             disable_notification=True,
         )
