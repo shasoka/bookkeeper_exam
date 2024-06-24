@@ -1,13 +1,11 @@
-from typing import Any
-
-from sqlalchemy import ForeignKey, JSON, ARRAY, Integer
+from sqlalchemy import ForeignKey, ARRAY, Integer, String
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.orm import mapped_column, Mapped
 
 
 class Base(AsyncAttrs, DeclarativeBase):
-    type_annotation_map = {dict[str, Any]: JSON, list[int]: ARRAY(Integer)}
+    type_annotation_map = {list[str]: ARRAY(String), list[int]: ARRAY(Integer)}
 
 
 class Section(Base):
@@ -37,7 +35,7 @@ class Question(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(nullable=False)
-    answers: Mapped[dict[str, Any]] = mapped_column(nullable=False)
+    answers: Mapped[list[str]] = mapped_column(nullable=False)
     correct_answer: Mapped[str] = mapped_column(nullable=False)
 
     theme_id: Mapped[int] = mapped_column(ForeignKey("themes.id"))

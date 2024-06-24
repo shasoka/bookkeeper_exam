@@ -23,12 +23,6 @@ class AuthMiddleware(BaseMiddleware):
                     NOT_AUTHORIZED,
                     disable_notification=True,
                 )
-                # return await event.answer(
-                #     """
-                #     Технические работы 😭
-                #     """,
-                #     disable_notification=True,
-                # )
             else:
                 if not user.username:
                     if event.from_user.username:

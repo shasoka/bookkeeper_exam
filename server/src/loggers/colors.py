@@ -16,7 +16,7 @@ class Colors:
     BROWN = "\033[0;33m"
     BLUE = "\033[0;34m"
     PURPLE = "\033[0;35m"
-    CYAN = "\033[96m"
+    CYAN = "\033[0;36m"
     LIGHT_GRAY = "\033[0;37m"
     DARK_GRAY = "\033[1;30m"
     LIGHT_RED = "\033[1;31m"
@@ -34,6 +34,9 @@ class Colors:
     NEGATIVE = "\033[7m"
     CROSSED = "\033[9m"
     END = "\033[0m"
+
+
+# --- #
 
 
 if __name__ == "__main__":
