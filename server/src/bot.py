@@ -875,6 +875,7 @@ async def delete_msg_handler(
         await bot.delete_message(chat_id=chat_id, message_id=message_id)
     except TelegramBadRequest as e:
         if isinstance(callback_query.message, Message):
+            # Otherwise callback_query.message will be an instance of InaccessibleMessage
             await bot.send_message(
                 chat_id=chat_id,
                 text=COULDNT_DELETE_MSG % html.code(str(message_id))
@@ -883,7 +884,7 @@ async def delete_msg_handler(
                     inline_keyboard=[[DELETE_INLINE_BUTTON]]
                 ),
             )
-            LOGGER.debug(
+            LOGGER.warning(
                 "[❌🧹] Couldn't delete msg=%s in chat with user=%s",
                 message_id,
                 chat_id,
