@@ -27,11 +27,11 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 from aiohttp import web
 
 from config import TG_TOKEN as TOKEN, BASE_WEBHOOK_URL, WEBHOOK_PATH, WEBHOOK_SECRET, WEB_SERVER_PORT, WEB_SERVER_HOST
-from loggers.logger import LOGGER
-from middleware.auth_mw import AuthMiddleware
-from middleware.log_mw import LoggingMiddleware
-from middleware.update_mw import LastChangelogMiddleware
-from resources.coroutines import DURATION, TASKS
+from logger import LOGGER
+from middlewares.auth_mw import AuthMiddleware
+from middlewares.log_mw import LoggingMiddleware
+from middlewares.update_mw import LastChangelogMiddleware
+from resources.constants import DURATION, TASKS
 from resources.reply_markups import DELETE_INLINE_BUTTON, get_hints_button
 from resources.strings import (
     on_quiz_end_success,
@@ -88,7 +88,7 @@ from services.entities_service import (
     save_msg_id,
     get_user
 )
-from services.quiz_service import parse_answers_from_question, parse_answers_from_poll
+from services.miscellaneous import parse_answers_from_question, parse_answers_from_poll
 
 
 dp: Dispatcher = Dispatcher()

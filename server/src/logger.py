@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import sys
 
 
@@ -47,6 +48,9 @@ class CustomFormatter(logging.Formatter):
             record.message, f"{self.MESSAGE_COLOR}{record.message}{reset}"
         )
 
+        at_pattern = re.compile(r'(@\w+)')
+        msg = at_pattern.sub(f"{self.COLORS['AT_COLOR']}\\1{reset}", msg)
+
         return msg
 
 
@@ -66,7 +70,7 @@ stream_handler = logging.StreamHandler(sys.stdout)
 stream_handler.setFormatter(formatter)
 
 LOGGER.handlers = [stream_handler]
-LOGGER.setLevel(logging.DEBUG)
+LOGGER.setLevel(logging.INFO)
 
 # --- #
 

@@ -4,7 +4,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
 
 from resources.strings import NOT_AUTHORIZED
-from services.auth_service import transliterate
+from services.miscellaneous import transliterate
 from services.entities_service import get_user, set_username
 
 

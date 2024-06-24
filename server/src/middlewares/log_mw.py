@@ -4,8 +4,8 @@ from typing import Callable, Any, Awaitable
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Message, CallbackQuery, PollAnswer
 
-from loggers.logger import LOGGER
-from services.auth_service import transliterate
+from logger import LOGGER
+from services.miscellaneous import transliterate
 from services.entities_service import get_user
 
 
@@ -58,7 +58,7 @@ class LoggingMiddleware(BaseMiddleware):
             LoggingMiddleware.__TIMINGS_LIST = []
 
         telegram_id = "<unknown_id>"
-        msg = f"Unknown event from %s in {te - ts}"
+        msg = f"Unknown event from @anonymous in {te - ts}"
         if isinstance(event, Message):
             username = LoggingMiddleware.collect_username(event, "m")
             telegram_id = event.from_user.id

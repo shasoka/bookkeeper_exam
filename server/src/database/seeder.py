@@ -61,6 +61,6 @@ def write_to_db(questions_dict: dict):
 
 
 if __name__ == "__main__":
-    with open(ROOT_DIR + "resources/parsed.json", "r", encoding="utf-8") as file:
+    with open(ROOT_DIR + "static/parsed.json", "r", encoding="utf-8") as file:
         data_dict = json.load(file)
     write_to_db(data_dict)
