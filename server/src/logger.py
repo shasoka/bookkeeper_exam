@@ -11,6 +11,7 @@ class CustomFormatter(logging.Formatter):
         "WARNING": "\033[93m",  # Yellow
         "ERROR": "\033[91m",  # Red
         "CRITICAL": "\033[95m",  # Magenta
+        "USERNAME": "\033[0m",
         "RESET": "\033[0m",  # Reset to default color
     }
     PATH_COLOR = "\033[96m"  # Cyan for path
@@ -49,7 +50,7 @@ class CustomFormatter(logging.Formatter):
         )
 
         at_pattern = re.compile(r'(@\w+)')
-        msg = at_pattern.sub(f"{self.COLORS['AT_COLOR']}\\1{reset}", msg)
+        msg = at_pattern.sub(f"{self.COLORS['USERNAME']}\\1{reset}", msg)
 
         return msg
 
