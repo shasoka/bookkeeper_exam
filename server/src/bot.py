@@ -522,6 +522,12 @@ async def exam(callback_query: CallbackQuery) -> None:
         await save_msg_id(user.telegram_id, s_msg.message_id, "s")
         return
 
+    if telegram_id not in TASKS:
+        callback_query.answer(
+            text="🫥 Кажется твоя экзаменационная сессия сломалась.\n😓К сожалению я не смогу восстановить таймер, а вместе с ним и саму сессию, т.к. таймер хранится в оперативной памяти а не в базе данных. Скорее всего мне пришлось перезагрузиться из-за обновления\n\n🔄 /exam",
+            show_alert=True
+        )
+
     if (TASKS[telegram_id][1] - datetime.now(UTC)).total_seconds() > 2:
         await save_msg_id(telegram_id, None, "a")
 
