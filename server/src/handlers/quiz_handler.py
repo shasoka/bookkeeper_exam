@@ -1,21 +1,22 @@
+import asyncio
 import random
 
 from aiogram import html
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery
 
-from handlers.utility_handlers import delete_msg_handler, try_send_msg_with_effect
-from resources.reply_markups import DELETE_INLINE_BUTTON, get_hints_button
-from resources.strings import SESSION_CREATING_DELAY, SESSION_CREATED, HEAL_ALERT, on_quiz_end_success, \
-    on_quiz_end_fail, SUCCESS_EFFECT_IDS, NO_MORE_HINTS
+from enums.markups import Markups
+from enums.strings import CallbackQueryAnswers, Alerts, Arrays, Messages
+from handlers.utility_handlers import delete_msg_handler, try_send_msg_with_effect, sleep_for_alert
 from services.entities_service import increase_help_alert_counter, get_user, init_session, clear_session, rerun_session, \
     get_user_with_session, save_msg_id, get_questions_with_len_by_theme, update_themes_progress, \
     get_cur_question_with_count, get_theme_by_id, decrease_hints
-from services.miscellaneous import parse_answers_from_question
+from services.utility_service import parse_answers_from_question
 
 
 # noinspection PyTypeChecker,PyAsyncCall
 async def quiz(callback_query: CallbackQuery) -> None:
     telegram_id: str = str(callback_query.from_user.id)
+    _bot = callback_query.bot if callback_query.bot else callback_query.message.bot
 
     if callback_query.data.startswith("quiz_init"):
         await increase_help_alert_counter(telegram_id)
@@ -31,7 +32,7 @@ async def quiz(callback_query: CallbackQuery) -> None:
         ):
             if alive_sessions:
                 await callback_query.answer(
-                    text=SESSION_CREATING_DELAY % "Создаю для тебя новую! 📒",
+                    text=CallbackQueryAnswers.SESSION_CREATION_DELAY % CallbackQueryAnswers.QUIZ_DELAY,
                     show_alert=False,
                     disable_notification=False,
                     cache_time=5
@@ -40,15 +41,12 @@ async def quiz(callback_query: CallbackQuery) -> None:
             await clear_session(callback_query, callback_query.bot)
 
         await callback_query.answer(
-            text=SESSION_CREATED,
+            text=CallbackQueryAnswers.QUIZ_SESSION_CREATED,
             show_alert=False,
             disable_notification=False,
         )
 
-        if user.help_alert_counter % 10 == 0:
-            await callback_query.answer(
-                text=HEAL_ALERT, show_alert=True, disable_notification=False
-            )
+        asyncio.create_task(sleep_for_alert(user.help_alert_counter, _bot, callback_query.message.chat.id))
 
     if callback_query.data.startswith("quiz_incorrect"):
         await delete_msg_handler(callback_query)
@@ -75,25 +73,15 @@ async def quiz(callback_query: CallbackQuery) -> None:
             bot=callback_query.bot,
             chat_id=callback_query.message.chat.id,
             text=(
-                on_quiz_end_success(user.session)
+                Messages.ON_QUIZ_END_SUCCESS % html.code(str(user.session.questions_total - len(user.session.incorrect_questions)) + '/' + str(user.session.questions_total))
                 if without_mistakes
-                else on_quiz_end_fail(user.session)
+                else Messages.ON_QUIZ_END_FAIL % html.code(str(user.session.questions_total - len(user.session.incorrect_questions)) + '/' + str(user.session.questions_total))
             ),
             reply_markup=(
-                InlineKeyboardMarkup(
-                    inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text="🧩", callback_data="quiz_incorrect"
-                            )
-                        ],
-                        [DELETE_INLINE_BUTTON],
-                    ]
-                )
-                if not without_mistakes
-                else InlineKeyboardMarkup(inline_keyboard=[[DELETE_INLINE_BUTTON]])
+                Markups.QUIZ_S_MSG_MARKUP.value if not without_mistakes
+                else Markups.ONLY_DELETE_MARKUP.value
             ),
-            message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
+            message_effect_id=random.choice(Arrays.SUCCESS_EFFECT_IDS.value),
         )
 
         _, questions_total = await get_questions_with_len_by_theme(
@@ -116,8 +104,14 @@ async def quiz(callback_query: CallbackQuery) -> None:
         return
 
     user = await get_user_with_session(telegram_id)
+
     if user.session.questions_total == user.session.progress:
-        raise IndexError
+        await _bot.send_message(
+            chat_id=callback_query.message.chat.id,
+            text=Messages.SOMETHING_WENT_WRONG,
+            reply_markup=Markups.ONLY_DELETE_MARKUP.value,
+        )
+        return
 
     await save_msg_id(telegram_id, None, "a")
 
@@ -146,17 +140,12 @@ async def quiz(callback_query: CallbackQuery) -> None:
     ):
         await update_themes_progress(user.telegram_id, user.session.theme_id, None)
 
-    _bot = callback_query.bot if callback_query.bot else callback_query.message.bot
     q_msg = await _bot.send_message(
         chat_id=callback_query.message.chat.id,
         text=f"{html.code(f'{user.session.progress + 1} / {questions_total}')}\n"
              f"\n{html.code(theme.title)}\n\n{html.bold(cur_question.title)}\n\n{answers_str}",
         disable_notification=True,
-        reply_markup=(
-            InlineKeyboardMarkup(inline_keyboard=[[get_hints_button(user.session)]])
-            if user.session.hints > 0 and user.hints_allowed
-            else None
-        ),
+        reply_markup=Markups.only_hints_markup(user.session) if user.session.hints > 0 and user.hints_allowed else None
     )
 
     p_msg = await _bot.send_poll(
@@ -189,7 +178,7 @@ async def hint_requested(callback_query: CallbackQuery) -> None:
     )
     await callback_query.answer(
         text=(
-            f"🧩 Входит в ответ: {''.join(sorted(random_hints_ids))}.\n🖼 Всего в ответе: {answer_len} буквы\n{NO_MORE_HINTS}"
+            f"🧩 Входит в ответ: {''.join(sorted(random_hints_ids))}.\n🖼 Всего в ответе: {answer_len} буквы\n{Alerts.NO_MORE_HINTS}"
             if len(cur_question.correct_answer) > 1
             else f"😐 Ты че?\nТут один верный ответ. Сам разбирайся.\n🏳️ Отнимать попытки не стану, ладно."
         ),

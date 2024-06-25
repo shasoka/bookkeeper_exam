@@ -1,10 +1,13 @@
+import asyncio
+
 from aiogram import html, Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup, Message, CallbackQuery
 
-from loggers.logger import LOGGER
-from resources.reply_markups import DELETE_INLINE_BUTTON
-from resources.strings import INVALID_EFFECT_ID, COULDNT_DELETE_MSG
+from loggers.setup import LOGGER
+from enums.markups import Markups
+from enums.logs import Logs
+from enums.strings import Messages, Alerts
 
 
 async def try_send_msg_with_effect(
@@ -27,7 +30,7 @@ async def try_send_msg_with_effect(
     except TelegramBadRequest:
         return await bot.send_message(
             chat_id=chat_id,
-            text=text + INVALID_EFFECT_ID % html.code(message_effect_id),
+            text=text + Messages.INVALID_EFFECT_ID % html.code(message_effect_id),
             reply_markup=reply_markup,
             message_effect_id=None,
             disable_notification=disable_notification,
@@ -51,14 +54,25 @@ async def delete_msg_handler(
         # Otherwise callback_query.message will be an instance of InaccessibleMessage
         await _bot.send_message(
             chat_id=chat_id,
-            text=COULDNT_DELETE_MSG % html.code(str(message_id))
+            text=Messages.COULDNT_DELETE_MSG % html.code(str(message_id))
             + f"\n\n{html.code('[' + e.message + ' | (' + str(chat_id) + ';' + str(message_id) + ')]')}",
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[[DELETE_INLINE_BUTTON]]
-            ),
+            reply_markup=Markups.ONLY_DELETE_MARKUP.value,
         )
-        LOGGER.warning(
-            "[❌🧹] Couldn't delete msg=%s in chat with user=%s",
-            message_id,
-            chat_id,
-        )
+        LOGGER.warning(Logs.COULDN_DELETE_MSG % (message_id, chat_id))
+
+
+async def sleep_for_alert(
+        counter: int,
+        bot: Bot,
+        chat_id: int | str
+) -> None:
+    if counter % 10 != 0:
+        return
+
+    await asyncio.sleep(2)
+    await bot.send_message(
+        chat_id=chat_id,
+        text=Alerts.HEAL_ALERT,
+        reply_markup=Markups.ONLY_DELETE_MARKUP.value,
+        disable_notification=False
+    )

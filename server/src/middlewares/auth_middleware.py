@@ -3,8 +3,8 @@ from typing import Callable, Any, Awaitable
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject
 
-from resources.strings import NOT_AUTHORIZED
-from services.miscellaneous import transliterate
+from enums.strings import Messages
+from services.utility_service import transliterate
 from services.entities_service import get_user, set_username
 
 
@@ -20,7 +20,7 @@ class AuthMiddleware(BaseMiddleware):
         if event.from_user:
             if not (user := await get_user(str(event.from_user.id))):
                 return await event.answer(
-                    NOT_AUTHORIZED,
+                    Messages.NOT_AUTHORIZED,
                     disable_notification=True,
                 )
             else:

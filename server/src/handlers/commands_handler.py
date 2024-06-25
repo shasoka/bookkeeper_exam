@@ -1,19 +1,20 @@
 from typing import Coroutine, Any
 
-from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram import html
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import Message, CallbackQuery
 
+from enums.markups import Markups
+from enums.strings import Messages
+from enums.types import CoroNoneReturn
 from handlers.buttons_handler import pet_me_button_pressed
 from handlers.exam_handler import exam, TASKS
 from handlers.quiz_handler import quiz
-from resources.reply_markups import DELETE_INLINE_BUTTON, get_hints_button
-from resources.strings import PET_ME, on_start_msg, EXAM_MESSAGE, SOMETHING_WENT_WRONG, HINTS_OFF, HINTS_ON
 from services.entities_service import clear_session, get_user, get_user_with_session, change_hints_policy
 
 
 # noinspection PyTypeChecker
-async def command_start_handler(message: Message) -> Coroutine[Any, Any, None]:
+async def command_start_handler(message: Message) -> CoroNoneReturn:
     """
     Handler for incoming :code:`/start` command.
 
@@ -24,22 +25,11 @@ async def command_start_handler(message: Message) -> Coroutine[Any, Any, None]:
     :return: :code:`None`
     """
 
-    # 1. Any - type of values that the coro can yield
-    # 2. Any - type of values that the coro can accept
-    # 3. None - type of expecting return of the coro
-
     await clear_session(message, message.bot)
 
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=PET_ME, callback_data="pet")],
-            [DELETE_INLINE_BUTTON],
-        ]
-    )
-
     await message.answer(
-        on_start_msg(message.from_user.full_name),
-        reply_markup=keyboard,
+        Messages.ON_START_MESSAGE % html.bold(message.from_user.full_name),
+        reply_markup=Markups.PET_ME_MARKUP.value,
         disable_notification=True,
     )
 
@@ -61,14 +51,8 @@ async def command_exam_handler(message: Message) -> Coroutine[Any, Any, None]:
     user = await get_user(str(message.from_user.id))
 
     await message.answer(
-        # There are always 35 questions in the exam session
-        text=EXAM_MESSAGE % html.code(str(user.exam_best) + "/35"),
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text="⚔️", callback_data="exam_init")],
-                [DELETE_INLINE_BUTTON],
-            ]
-        ),
+        text=Messages.EXAM_MESSAGE % html.code(str(user.exam_best)),
+        reply_markup=Markups.FIGHT_ME_MARKUP.value,
         disable_notification=True,
     )
 
@@ -131,8 +115,8 @@ async def command_heal_handler(message: Message) -> Coroutine[Any, Any, None]:
             )
     except (AttributeError, IndexError, KeyError):
         await message.answer(
-            SOMETHING_WENT_WRONG,
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[DELETE_INLINE_BUTTON]]),
+            Messages.SOMETHING_WENT_WRONG,
+            reply_markup=Markups.ONLY_DELETE_MARKUP.value,
         )
 
 
@@ -142,8 +126,8 @@ async def command_change_hints_policy_handler(message: Message) -> Coroutine[Any
     user_session = user.session
 
     await message.answer(
-        HINTS_OFF if user.hints_allowed else HINTS_ON,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[DELETE_INLINE_BUTTON]]),
+        text=Messages.HINTS_OFF if user.hints_allowed else Messages.HINTS_ON,
+        reply_markup=Markups.ONLY_DELETE_MARKUP.value,
     )
     await change_hints_policy(str(message.from_user.id))
 
@@ -157,16 +141,14 @@ async def command_change_hints_policy_handler(message: Message) -> Coroutine[Any
                     await message.bot.edit_message_reply_markup(
                         chat_id=int(user.telegram_id),
                         message_id=user_session.cur_q_msg,
-                        reply_markup=InlineKeyboardMarkup(
-                            inline_keyboard=[[get_hints_button(user_session)]]
-                        ),
+                        reply_markup=Markups.only_hints_markup(user_session)
                     )
             else:  # Hints not allowed
                 if user_session.cur_q_msg:
                     await message.bot.edit_message_reply_markup(
                         chat_id=int(user.telegram_id),
                         message_id=user_session.cur_q_msg,
-                        reply_markup=None,
+                        reply_markup=None
                     )
     except (TelegramBadRequest, AttributeError):
         pass

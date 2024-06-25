@@ -1,13 +1,7 @@
-class Colors:
-    """ANSI color codes"""
+from enum import StrEnum
 
-    LOG_LEVLES = {
-        "DEBUG": "\033[94m",  # Blue
-        "INFO": "\033[92m",  # Green
-        "WARNING": "\033[93m",  # Yellow
-        "ERROR": "\033[91m",  # Red
-        "CRITICAL": "\033[95m",  # Magenta
-    }
+
+class Colors(StrEnum):
 
     WHITE = "\033[97m"
     BLACK = "\033[0;30m"
@@ -36,10 +30,10 @@ class Colors:
     END = "\033[0m"
 
 
-# --- #
-
-
-if __name__ == "__main__":
-    for i in dir(Colors):
-        if i[0:1] != "_" and i != "END":
-            print("{:>16} {}".format(i, getattr(Colors, i) + i + Colors.END))
+LOG_LEVLES = {
+        "DEBUG": "\033[94m",  # Blue
+        "INFO": "\033[92m",  # Green
+        "WARNING": "\033[93m",  # Yellow
+        "ERROR": "\033[91m",  # Red
+        "CRITICAL": "\033[95m",  # Magenta
+    }

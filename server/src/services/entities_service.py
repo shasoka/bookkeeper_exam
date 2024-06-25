@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from database.connection import SessionLocal
 from database.models import User, UserSession, Theme, Question, Section
-from services.miscellaneous import parse_answers_from_question
+from services.utility_service import parse_answers_from_question
 
 
 # noinspection PyTypeChecker
@@ -276,7 +276,6 @@ async def rerun_session(telegram_id: str) -> None:
             .options(selectinload(User.session))
         )
         user_session = user.scalars().first().session
-
         incorrects = user_session.incorrect_questions
         user_session.questions_queue = incorrects
         user_session.incorrect_questions = []

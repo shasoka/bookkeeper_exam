@@ -1,51 +1,37 @@
+from aiogram import html
 from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 
+from enums.markups import Markups, Buttons
+from enums.strings import Messages, NavButtons, CallbackQueryAnswers, Markers
 from handlers.utility_handlers import delete_msg_handler
-from resources.reply_markups import DELETE_INLINE_BUTTON
-from resources.strings import SECTIONS_FROM_START, SECTIONS_FROM_RESTART, FORWARD, BACK, \
-    BACK_TO_SECTIONS, on_section_chosen, LETS_GO, LETS_SHUFFLE, BACK_TO_THEMES, MARK_THEME, on_theme_chosen
-from services.entities_service import get_sections, get_themes_by_section, get_user, get_theme_by_id, \
-    get_questions_with_len_by_theme, update_themes_progress
+from services.entities_service import (
+    get_sections,
+    get_themes_by_section,
+    get_user,
+    get_theme_by_id,
+    get_questions_with_len_by_theme,
+    update_themes_progress
+)
 
 
 # noinspection PyTypeChecker
 async def pet_me_button_pressed(callback_query: CallbackQuery | Message) -> None:
     sections = await get_sections()
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=f"{sections[0].title}", callback_data="section_1"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=f"{sections[1].title}", callback_data="section_2"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=f"{sections[2].title}", callback_data="section_3"
-                )
-            ],
-            [DELETE_INLINE_BUTTON],
-        ]
-    )
 
     if isinstance(callback_query, CallbackQuery):
         await delete_msg_handler(callback_query)
         await callback_query.bot.send_message(
             chat_id=callback_query.message.chat.id,
-            text=SECTIONS_FROM_START,
-            reply_markup=keyboard,
-            disable_notification=True,
+            text=Messages.SECTIONS_FROM_START,
+            reply_markup=Markups.sections_markup(sections),
+            disable_notification=True
         )
     else:
         await callback_query.bot.send_message(
             chat_id=callback_query.chat.id,
-            text=SECTIONS_FROM_RESTART,
-            reply_markup=keyboard,
-            disable_notification=True,
+            text=Messages.SECTIONS_FROM_RESTART,
+            reply_markup=Markups.sections_markup(sections),
+            disable_notification=True
         )
 
 
@@ -64,13 +50,13 @@ async def section_button_pressed(callback_query: CallbackQuery) -> None:
     # Добавление кнопок тем
     for i, theme in enumerate(themes[start_index:end_index]):
         if theme.id in user.themes_done_full:
-            marker = "🟢"
+            marker = Markers.GREEN
         elif theme.id in user.themes_done_particular:
-            marker = "🟡"
+            marker = Markers.YELLOW
         elif theme.id in user.themes_tried:
-            marker = "🟠"
+            marker = Markers.ORANGE
         else:
-            marker = "🔴"
+            marker = Markers.RED
         keyboard.inline_keyboard.append(
             [
                 InlineKeyboardButton(
@@ -85,7 +71,7 @@ async def section_button_pressed(callback_query: CallbackQuery) -> None:
         keyboard.inline_keyboard.append(
             [
                 InlineKeyboardButton(
-                    text=FORWARD,
+                    text=NavButtons.FORWARD_ARROW,
                     callback_data=f"page_{start_page + 1}_{str(chosen_section)}",
                 )
             ]
@@ -99,7 +85,7 @@ async def section_button_pressed(callback_query: CallbackQuery) -> None:
             keyboard.inline_keyboard.append(
                 [
                     InlineKeyboardButton(
-                        text=BACK,
+                        text=NavButtons.BACK_ARROW,
                         callback_data=f"page_{start_page - 1},{str(chosen_section)}",
                     )
                 ]
@@ -108,80 +94,41 @@ async def section_button_pressed(callback_query: CallbackQuery) -> None:
             keyboard.inline_keyboard[-1].insert(
                 0,
                 InlineKeyboardButton(
-                    text=BACK,
+                    text=NavButtons.BACK_ARROW,
                     callback_data=f"page_{start_page - 1},{str(chosen_section)}",
                 ),
             )
 
     # Добавление кнопки возвращения к разделам
     keyboard.inline_keyboard.append(
-        [InlineKeyboardButton(text=BACK_TO_SECTIONS, callback_data="pet")]
+        [InlineKeyboardButton(text=NavButtons.BACK_TO_SECTIONS, callback_data="pet")]
     )
     # Добавление кнопки удаления сообщения
-    keyboard.inline_keyboard.append([DELETE_INLINE_BUTTON])
+    keyboard.inline_keyboard.append([Buttons.DELETE_BUTTON.value])
 
     await delete_msg_handler(callback_query)
     await callback_query.message.bot.send_message(
         chat_id=callback_query.message.chat.id,
-        text=on_section_chosen(chosen_section),
+        text=Messages.ON_SECTIONS_CHOSEN % (Messages.ONE * chosen_section),
         reply_markup=keyboard,
-        disable_notification=True,
+        disable_notification=True
     )
 
 
 # noinspection PyTypeChecker
 async def theme_button_pressed(callback_query: CallbackQuery) -> None:
-    chosen_theme_from_callback, choosen_section = callback_query.data.split("_")[1:]
+    chosen_theme_from_callback, chosen_section = callback_query.data.split("_")[1:]
     chosen_theme = await get_theme_by_id(int(chosen_theme_from_callback))
     user = await get_user(str(callback_query.from_user.id))
 
     _, questions_total = await get_questions_with_len_by_theme(int(chosen_theme_from_callback))
 
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=LETS_GO,
-                    callback_data="quiz_init_" + chosen_theme_from_callback,
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=LETS_SHUFFLE,
-                    callback_data="quiz_init_shuffle_" + chosen_theme_from_callback,
-                )
-            ],
-            (
-                [
-                    InlineKeyboardButton(
-                        text=BACK_TO_THEMES, callback_data="section_" + choosen_section
-                    ),
-                    InlineKeyboardButton(
-                        text=MARK_THEME,
-                        callback_data="mark_theme_"
-                        + str(chosen_theme.id)
-                        + "_"
-                        + str(choosen_section),
-                    ),
-                ]
-                if chosen_theme.id not in user.themes_done_full
-                else [
-                    InlineKeyboardButton(
-                        text=BACK_TO_THEMES + " ◀️",
-                        callback_data="section_" + choosen_section,
-                    )
-                ]
-            ),
-            [DELETE_INLINE_BUTTON],
-        ]
-    )
-
     await delete_msg_handler(callback_query)
     await callback_query.message.bot.send_message(
         chat_id=callback_query.message.chat.id,
-        text=on_theme_chosen(chosen_theme.title, str(questions_total)),
-        reply_markup=keyboard,
-        disable_notification=True,
+        text=Messages.ON_THEME_CHOSEN % (html.italic(chosen_theme.title), html.code(str(questions_total))),
+        reply_markup=Markups.theme_chosen_markup(chosen_theme, user),
+        disable_notification=True
     )
 
 
@@ -189,12 +136,12 @@ async def mark_theme_as_done(callback_query: CallbackQuery) -> None:
     theme, section = callback_query.data.split("_")[2:]
 
     await update_themes_progress(str(callback_query.from_user.id), int(theme), True)
-    await callback_query.answer("✅")
+    await callback_query.answer(CallbackQueryAnswers.THEME_MARKED)
 
     new_markup = callback_query.message.reply_markup
     new_markup.inline_keyboard[2] = [
         InlineKeyboardButton(
-            text=BACK_TO_THEMES + " ◀️", callback_data="section_" + section
+            text=NavButtons.BACK_TO_THEMES + " " + NavButtons.BACK_TRIANGLE, callback_data="section_" + section
         )
     ]
     await callback_query.message.bot.edit_message_reply_markup(

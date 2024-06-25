@@ -3,12 +3,12 @@ import os
 import re
 import sys
 
-from loggers.colors import Colors
+from enums.colors import Colors, LOG_LEVLES
 
 
 class CustomFormatter(logging.Formatter):
     def format(self, record):
-        lvl_color = Colors.LOG_LEVLES.get(record.levelname, Colors.END)
+        lvl_color = LOG_LEVLES.get(record.levelname, Colors.END)
         username_color = Colors.LIGHT_BLUE
         message_color = Colors.WHITE
         path_color = Colors.LIGHT_CYAN

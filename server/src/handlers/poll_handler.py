@@ -2,13 +2,19 @@ import random
 
 from aiogram import html
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import PollAnswer, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import PollAnswer
 
+from enums.markups import Markups
+from enums.strings import Arrays, Messages
 from handlers.utility_handlers import try_send_msg_with_effect
-from resources.strings import SUCCESS_STATUSES, SUCCESS_EFFECT_IDS, FAIL_STATUSES, FAIL_EFFECT_IDS
-from services.entities_service import get_user_with_session, get_cur_question_with_count, append_incorrects, \
-    save_msg_id, increase_progress
-from services.miscellaneous import parse_answers_from_question, parse_answers_from_poll
+from services.entities_service import (
+    get_user_with_session,
+    get_cur_question_with_count,
+    append_incorrects,
+    save_msg_id,
+    increase_progress
+)
+from services.utility_service import parse_answers_from_question, parse_answers_from_poll
 
 
 # noinspection PyTypeChecker
@@ -49,48 +55,23 @@ async def on_poll_answer(poll_answer: PollAnswer):
         a_msg = await try_send_msg_with_effect(
             bot=poll_answer.bot,
             chat_id=user.telegram_id,
-            text="✅ " + html.bold(random.choice(SUCCESS_STATUSES)),
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text=(
-                                "➡️"
-                                if user_session.progress < questions_total - 1
-                                else "🏁"
-                            ),
-                            callback_data=callback_data,
-                        )
-                    ]
-                ]
+            text=Messages.TICK + " " + html.bold(random.choice(Arrays.SUCCESS_STATUSES.value)),
+            reply_markup=Markups.next_question_markup(
+                next_q=user_session.progress < questions_total - 1,
+                callback_data=callback_data
             ),
-            message_effect_id=random.choice(SUCCESS_EFFECT_IDS),
+            message_effect_id=random.choice(Arrays.SUCCESS_EFFECT_IDS.value),
         )
     else:
         a_msg = await try_send_msg_with_effect(
             bot=poll_answer.bot,
             chat_id=user.telegram_id,
-            text="❌ "
-            + html.bold(random.choice(FAIL_STATUSES))
-            + "\n\n❕ "
-            + html.bold("Правильный ответ:")
-            + " "
-            + html.italic(correct_answer),
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text=(
-                                "➡️"
-                                if user_session.progress < questions_total - 1
-                                else "🏁"
-                            ),
-                            callback_data=callback_data,
-                        )
-                    ]
-                ]
+            text=Messages.CROSS + " " + html.bold(random.choice(Arrays.FAIL_STATUSES.value)) + Messages.CORRECT_ANSWER + html.italic(correct_answer),
+            reply_markup=Markups.next_question_markup(
+                next_q=user_session.progress < questions_total - 1,
+                callback_data=callback_data
             ),
-            message_effect_id=random.choice(FAIL_EFFECT_IDS),
+            message_effect_id=random.choice(Arrays.FAIL_EFFECT_IDS.value),
         )
         await append_incorrects(str(poll_answer.user.id), cur_question.id)
 

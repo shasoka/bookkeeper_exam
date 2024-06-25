@@ -4,8 +4,9 @@ from typing import Callable, Any, Awaitable
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Message, CallbackQuery, PollAnswer
 
-from loggers.logger import LOGGER
-from services.miscellaneous import transliterate
+from enums.logs import Logs
+from loggers.setup import LOGGER
+from services.utility_service import transliterate
 from services.entities_service import get_user
 
 
@@ -51,9 +52,7 @@ class LoggingMiddleware(BaseMiddleware):
         LoggingMiddleware.__TIMINGS_LIST.append(timing)
 
         if LoggingMiddleware.__AVG_TIME_COUNTER % 25 == 0:
-            LOGGER.info(
-                f"[⏳] Average timing for 25 last requsts: {sum(LoggingMiddleware.__TIMINGS_LIST) / 25:.5f}"
-            )
+            LOGGER.info(Logs.AVG_TIMING % (sum(LoggingMiddleware.__TIMINGS_LIST) / 25))
             LoggingMiddleware.__AVG_TIME_COUNTER = 0
             LoggingMiddleware.__TIMINGS_LIST = []
 
@@ -81,6 +80,6 @@ class LoggingMiddleware(BaseMiddleware):
 
         user = await get_user(str(telegram_id))
         if not user:
-            LOGGER.info(msg % "🔒")
+            LOGGER.info(msg % Logs.LOCK)
         else:
-            LOGGER.info(msg % "🔓")
+            LOGGER.info(msg % Logs.UNLOCK)
