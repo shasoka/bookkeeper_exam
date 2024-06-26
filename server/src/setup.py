@@ -1,13 +1,9 @@
-from typing import Any, Coroutine
-
+from aiogram import Dispatcher, Bot
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
 
-from config import TG_TOKEN as TOKEN, BASE_WEBHOOK_URL, WEBHOOK_PATH, WEBHOOK_SECRET
-
-from aiogram import Dispatcher, Bot
-
+from config import TG_TOKEN as TOKEN
 from enums.strings import SlashCommands
 from handlers.buttons_handler import pet_me_button_pressed, theme_button_pressed, section_button_pressed, \
     mark_theme_as_done
@@ -55,10 +51,3 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.callback_query.register(mark_theme_as_done, lambda c: c.data.startswith("mark_theme_"))
 
     dp.poll_answer.register(on_poll_answer)
-
-
-async def webhook(bot: Bot) -> None:
-    await bot.set_webhook(
-        url=f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}",
-        secret_token=WEBHOOK_SECRET
-    )
