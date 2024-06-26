@@ -4,6 +4,7 @@ from asyncio import Task
 from datetime import datetime, UTC, timedelta
 
 from aiogram import html
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 
 from enums.logs import Logs
@@ -112,11 +113,14 @@ async def exam(callback_query: CallbackQuery) -> None:
         if (user.session.progress + 1) % 5 == 0:
             delta = int((TASKS[telegram_id][1] - datetime.now(UTC)).total_seconds())
             minutes, seconds = divmod(delta, 60)
-            await callback_query.answer(
-                text=f"{CallbackQueryAnswers.TIMER} {minutes:02d}:{seconds:02d}",
-                show_alert=False,
-                disable_notification=True,
-            )
+            try:
+                await callback_query.answer(
+                    text=f"{CallbackQueryAnswers.TIMER} {minutes:02d}:{seconds:02d}",
+                    show_alert=False,
+                    disable_notification=True,
+                )
+            except (TelegramBadRequest, RuntimeError):
+                pass
 
         if not callback_query.data.startswith("exam_init"):
             to_delete = [
