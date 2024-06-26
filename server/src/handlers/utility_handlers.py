@@ -2,7 +2,7 @@ import asyncio
 
 from aiogram import html, Bot
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import InlineKeyboardMarkup, CallbackQuery
+from aiogram.types import InlineKeyboardMarkup, CallbackQuery, Message
 
 from enums.logs import Logs
 from enums.markups import Markups
