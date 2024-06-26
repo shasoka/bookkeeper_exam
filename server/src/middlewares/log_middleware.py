@@ -6,33 +6,13 @@ from aiogram.types import TelegramObject, Message, CallbackQuery, PollAnswer
 
 from enums.logs import Logs
 from loggers.setup import LOGGER
-from services.utility_service import transliterate
+from middlewares.miscellaneous import collect_username
 from services.entities_service import get_user
 
 
 class LoggingMiddleware(BaseMiddleware):
     __AVG_TIME_COUNTER = 0
     __TIMINGS_LIST = []
-
-    @staticmethod
-    def m_q_username(event: Message | CallbackQuery | PollAnswer) -> str:
-        if not (username := event.from_user.username):
-            username = transliterate(
-                event.from_user.full_name.replace(" ", "_")
-            ).lower()
-        return username
-
-    @staticmethod
-    def collect_username(event: Message | CallbackQuery | PollAnswer, flag: str) -> str:
-        match flag:
-            case "m" | "q":
-                return LoggingMiddleware.m_q_username(event)
-            case "p":
-                if not (username := event.user.username):
-                    username = transliterate(
-                        event.user.full_name.replace(" ", "_")
-                    ).lower()
-                return username
 
     # noinspection PyTypeChecker
     async def __call__(
@@ -59,7 +39,7 @@ class LoggingMiddleware(BaseMiddleware):
         telegram_id = "<unknown_id>"
         msg = f"[{Logs.LOCK}] Unknown event from @anonymous in {te - ts}"
         if isinstance(event, Message):
-            username = LoggingMiddleware.collect_username(event, "m")
+            username = collect_username(event, "m")
             telegram_id = event.from_user.id
             if event.text:
                 if "/" in event.text:
@@ -69,11 +49,11 @@ class LoggingMiddleware(BaseMiddleware):
             else:
                 msg = f'[%s{Logs.MESSAGE}] Message "<non_text_data>" from {event.from_user.id}@{username} in {timing}'
         elif isinstance(event, CallbackQuery):
-            username = LoggingMiddleware.collect_username(event, "q")
+            username = collect_username(event, "q")
             telegram_id = event.from_user.id
             msg = f'[%s{Logs.CALLBACK}] Callback "{event.data}" from {event.from_user.id}@{username} in {timing}'
         elif isinstance(event, PollAnswer):
-            username = LoggingMiddleware.collect_username(event, "p")
+            username = collect_username(event, "p")
             telegram_id = event.user.id
             answer = "".join(["абвгдежзиклмн"[i] for i in event.option_ids])
             msg = f'[%s{Logs.ANSWER}] Answer "{answer}" from {event.user.id}@{username} in {timing}'

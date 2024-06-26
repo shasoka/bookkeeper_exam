@@ -147,7 +147,6 @@ async def increase_help_alert_counter(telegram_id: str) -> None:
         await session.refresh(user)
 
 
-# noinspection PyTypeChecker
 async def clear_session(message: Message | CallbackQuery, bot: Bot) -> None:
     async with SessionLocal() as session:
         user = await get_user_with_session(str(message.from_user.id))
@@ -242,7 +241,6 @@ async def update_user_exam_best(telegram_id: str, score: int) -> None:
             return
 
 
-# noinspection PyTypeChecker
 async def init_session(theme_id: int, telegram_id: str, shuffle: bool) -> bool:
     async with SessionLocal() as session:
         user = await get_user_with_session(telegram_id)
@@ -392,7 +390,6 @@ async def get_cur_question_with_count(telegram_id: str) -> tuple[Question, int]:
         return cur_question, len(user.session.questions_queue)
 
 
-# noinspection PyTypeChecker
 async def get_sections() -> list[Section]:
     async with SessionLocal() as session:
         sections = await session.execute(select(Section))
