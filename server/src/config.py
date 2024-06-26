@@ -1,3 +1,10 @@
+"""
+Module, which loads environment variables from ``.env`` file and stores them in constants.
+
+Example ``.env`` file is in the ``server`` folder
+"""
+
+
 import os
 
 from typing import Final
@@ -5,7 +12,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Константы конфигурации для соединения с БД
+# Constants for Database
 DB_HOST: Final[str] = os.environ.get("DB_HOST")
 DB_PORT: Final[str] = os.environ.get("DB_PORT")
 DB_NAME: Final[str] = os.environ.get("DB_NAME")
@@ -21,5 +28,5 @@ WEBHOOK_PATH: Final[str] = os.environ.get("WEBHOOK_PATH")
 WEBHOOK_SECRET: Final[str] = os.environ.get("WEBHOOK_SECRET")
 BASE_WEBHOOK_URL: Final[str] = os.environ.get("BASE_WEBHOOK_URL")
 
-# Константы конфигурации для бота
+# Constants for Telegram
 TG_TOKEN: Final[str] = os.environ.get("TG_TOKEN")

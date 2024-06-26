@@ -1,7 +1,15 @@
 """
-Main module. Contains an entry point of the app.
+Entry point of the application.
 
-Here the dispatcher and the bot are instantiated. Polling runs with :code:`concurrent.futures.ProcessPoolExecutor()`.
+Calls the ``cli:main`` function.
+
+====
+
+**Author**: Arkady Schoenberg (shasoka@yandex.ru)
+
+**Version**: 1.0.0 (26.06.2024)
+
+**License**: MIT
 """
 
 from cli import main

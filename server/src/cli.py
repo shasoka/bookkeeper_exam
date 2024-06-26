@@ -1,3 +1,12 @@
+"""
+Module, which contains the command line interface (CLI) for the bot.
+
+There are only two options:
+    - ``--webhook`` for running in webhook mode
+    - ``--polling`` for running in polling mode
+"""
+
+
 import asyncio
 from concurrent import futures
 
@@ -16,6 +25,13 @@ from setup import setup
 @click.option('--webhook', is_flag=True, help="Run the bot in webhook mode")
 @click.option('--polling', is_flag=True, help="Run the bot in polling mode")
 def main(webhook: bool, polling: bool) -> None:
+    """
+    Click-decorated function for CLI.
+
+    :param webhook: boolean flag for webhook mode, defaults to ``False`` if not specified
+    :param polling: boolean flag for polling mode, defaults to ``False`` if not specified
+    """
+
     if webhook:
         LOGGER.info(Logs.WEBHOOK_MODE)
         _webhook_mode()
@@ -27,6 +43,14 @@ def main(webhook: bool, polling: bool) -> None:
 
 
 async def __set_wh(bot: Bot) -> None:
+    """
+    Function, which sets webhook for the bot.
+
+    Runs on dispatcher startup.
+
+    :param bot: instance of ``aiogram.Bot``
+    """
+
     await bot.set_webhook(
         url=f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}",
         secret_token=WEBHOOK_SECRET
@@ -34,6 +58,12 @@ async def __set_wh(bot: Bot) -> None:
 
 
 def _webhook_mode() -> None:
+    """
+    Function, that runs the bot in webhook mode.
+
+    ``http.web.run_app`` runs in separated process.
+    """
+
     # Get dispatcher and bot
     dp, bot = setup()
 
@@ -62,6 +92,12 @@ def _webhook_mode() -> None:
 
 
 async def _polling_mode() -> None:
+    """
+    Function, that runs the bot in long polling mode.
+
+    ``aiogram.Dispatcher.start_polling`` runs in separated process.
+    """
+
     # Get dispatcher and bot
     dp, bot = setup()
 

@@ -8,7 +8,7 @@ class Logs(StrEnum):
     UNLOCK: Final[str] = "🔓"
     MESSAGE: Final[str] = "💬"
     CALLBACK: Final[str] = "📞"
-    GRAY_TICK: Final[str] = "☑️"
+    ANSWER: Final[str] = "🔑"
     COMMAND: Final[str] = "🤖"
 
     COULDN_DELETE_MSG: Final[str] = "[❌🧹] Couldn't delete msg=%s in chat with user=%s"

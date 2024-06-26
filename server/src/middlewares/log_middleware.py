@@ -76,7 +76,7 @@ class LoggingMiddleware(BaseMiddleware):
             username = LoggingMiddleware.collect_username(event, "p")
             telegram_id = event.user.id
             answer = "".join(["абвгдежзиклмн"[i] for i in event.option_ids])
-            msg = f'[%s{Logs.GRAY_TICK}] Answer "{answer}" from {event.user.id}@{username} in {timing}'
+            msg = f'[%s{Logs.ANSWER}] Answer "{answer}" from {event.user.id}@{username} in {timing}'
 
         user = await get_user(str(telegram_id))
         if not user:
