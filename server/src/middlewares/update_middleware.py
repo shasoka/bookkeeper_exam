@@ -4,10 +4,12 @@ from typing import Callable, Any, Awaitable
 
 from aiogram import BaseMiddleware, html
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import TelegramObject, LinkPreviewOptions, InlineKeyboardMarkup
+from aiogram.types import TelegramObject, LinkPreviewOptions
 
+from enums.logs import Logs
 from enums.markups import Markups
 from enums.strings import Arrays, Messages
+from loggers.setup import LOGGER
 from services.entities_service import get_user, changelog_seen
 
 
@@ -39,6 +41,7 @@ class LastChangelogMiddleware(BaseMiddleware):
                         disable_notification=False,
                         reply_markup=Markups.ONLY_DELETE_MARKUP.value
                     )
+                LOGGER.info(Logs.CHANGE_LOG_SEEN % (user.telegram_id + '@' + user.username))
                 await changelog_seen(str(event.from_user.id))
                 await asyncio.sleep(5)
         return await handler(event, data)

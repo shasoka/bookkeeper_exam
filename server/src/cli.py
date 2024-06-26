@@ -7,6 +7,8 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 from aiohttp import web
 
 from config import BASE_WEBHOOK_URL, WEBHOOK_PATH, WEBHOOK_SECRET, WEB_SERVER_HOST, WEB_SERVER_PORT
+from enums.logs import Logs
+from loggers.setup import LOGGER
 from setup import setup
 
 
@@ -15,8 +17,10 @@ from setup import setup
 @click.option('--polling', is_flag=True, help="Run the bot in polling mode")
 def main(webhook: bool, polling: bool) -> None:
     if webhook:
+        LOGGER.info(Logs.WEBHOOK_MODE)
         _webhook_mode()
     elif polling:
+        LOGGER.info(Logs.POLLING_MODE)
         asyncio.run(_polling_mode())
     else:
         click.echo("Please specify a mode: --webhook or --polling")

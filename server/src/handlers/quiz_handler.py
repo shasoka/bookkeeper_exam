@@ -4,9 +4,11 @@ import random
 from aiogram import html
 from aiogram.types import CallbackQuery
 
+from enums.logs import Logs
 from enums.markups import Markups
 from enums.strings import CallbackQueryAnswers, Alerts, Arrays, Messages
 from handlers.utility_handlers import delete_msg_handler, try_send_msg_with_effect, sleep_for_alert
+from loggers.setup import LOGGER
 from services.entities_service import increase_help_alert_counter, get_user, init_session, clear_session, rerun_session, \
     get_user_with_session, save_msg_id, get_questions_with_len_by_theme, update_themes_progress, \
     get_cur_question_with_count, get_theme_by_id, decrease_hints
@@ -38,6 +40,7 @@ async def quiz(callback_query: CallbackQuery) -> None:
                     cache_time=5
                 )
                 alive_sessions = False
+                LOGGER.warning(Logs.TOO_MANY_SESSIONS % (user.telegram_id + '@' + user.username))
             await clear_session(callback_query, callback_query.bot)
 
         await callback_query.answer(
@@ -111,6 +114,7 @@ async def quiz(callback_query: CallbackQuery) -> None:
             text=Messages.SOMETHING_WENT_WRONG,
             reply_markup=Markups.ONLY_DELETE_MARKUP.value,
         )
+        LOGGER.warning(Logs.SESSION_BROKEN % (str(user.session.id), user.telegram_id + '@' + user.username))
         return
 
     await save_msg_id(telegram_id, None, "a")

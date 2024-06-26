@@ -4,9 +4,11 @@ from aiogram import html
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import PollAnswer
 
+from enums.logs import Logs
 from enums.markups import Markups
 from enums.strings import Arrays, Messages
 from handlers.utility_handlers import try_send_msg_with_effect
+from loggers.setup import LOGGER
 from services.entities_service import (
     get_user_with_session,
     get_cur_question_with_count,
@@ -62,6 +64,7 @@ async def on_poll_answer(poll_answer: PollAnswer):
             ),
             message_effect_id=random.choice(Arrays.SUCCESS_EFFECT_IDS.value),
         )
+        LOGGER.info(Logs.CORRECT_ANS % (user.telegram_id + '@' + user.username))
     else:
         a_msg = await try_send_msg_with_effect(
             bot=poll_answer.bot,
@@ -74,6 +77,7 @@ async def on_poll_answer(poll_answer: PollAnswer):
             message_effect_id=random.choice(Arrays.FAIL_EFFECT_IDS.value),
         )
         await append_incorrects(str(poll_answer.user.id), cur_question.id)
+        LOGGER.info(Logs.INCORRECT_ANS % (user.telegram_id + '@' + user.username))
 
     await save_msg_id(str(poll_answer.user.id), a_msg.message_id, "a")
     await increase_progress(str(poll_answer.user.id))

@@ -9,6 +9,8 @@ from sqlalchemy.orm import selectinload
 
 from database.connection import SessionLocal
 from database.models import User, UserSession, Theme, Question, Section
+from enums.logs import Logs
+from loggers.setup import LOGGER
 from services.utility_service import parse_answers_from_question
 
 
@@ -233,6 +235,7 @@ async def update_user_exam_best(telegram_id: str, score: int) -> None:
         user = user.scalars().first()
         if score > user.exam_best:
             user.exam_best = score
+            LOGGER.info(Logs.EXAM_RECORD % (user.telegram_id + '@' + user.username))
             await session.commit()
             await session.refresh(user)
         else:

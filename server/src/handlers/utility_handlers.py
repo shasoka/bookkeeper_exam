@@ -2,12 +2,12 @@ import asyncio
 
 from aiogram import html, Bot
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import InlineKeyboardMarkup, Message, CallbackQuery
+from aiogram.types import InlineKeyboardMarkup, CallbackQuery
 
-from loggers.setup import LOGGER
-from enums.markups import Markups
 from enums.logs import Logs
+from enums.markups import Markups
 from enums.strings import Messages, Alerts
+from loggers.setup import LOGGER
 
 
 async def try_send_msg_with_effect(
@@ -28,6 +28,7 @@ async def try_send_msg_with_effect(
             disable_notification=disable_notification,
         )
     except TelegramBadRequest:
+        LOGGER.warning(Logs.COULDNT_SEND_MSG_WITH_EFFECT % message_effect_id)
         return await bot.send_message(
             chat_id=chat_id,
             text=text + Messages.INVALID_EFFECT_ID % html.code(message_effect_id),

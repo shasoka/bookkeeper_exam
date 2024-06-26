@@ -6,10 +6,12 @@ from datetime import datetime, UTC, timedelta
 from aiogram import html
 from aiogram.types import CallbackQuery
 
+from enums.logs import Logs
 from enums.markups import Markups
 from enums.strings import CallbackQueryAnswers, Arrays, Messages
 from handlers.buttons_handler import delete_msg_handler
 from handlers.utility_handlers import try_send_msg_with_effect, sleep_for_alert
+from loggers.setup import LOGGER
 from services.entities_service import increase_help_alert_counter, get_user, init_exam_session, clear_session, \
     get_user_with_session, save_msg_id, update_user_exam_best, get_cur_question_with_count
 from services.utility_service import parse_answers_from_question
@@ -39,6 +41,7 @@ async def exam(callback_query: CallbackQuery) -> None:
                     disable_notification=False,
                 )
                 alive_sessions = False
+                LOGGER.warning(Logs.TOO_MANY_SESSIONS % (user.telegram_id + '@' + user.username))
             await clear_session(callback_query, callback_query.bot)
 
         asyncio.create_task(sleep_for_alert(user.help_alert_counter, _bot, callback_query.message.chat.id))
@@ -77,6 +80,7 @@ async def exam(callback_query: CallbackQuery) -> None:
                 + "\n\n"
                 + Messages.ON_EXAM_END % (Messages.EXAM_RECORD if score > user.exam_best else Messages.EXAM_NOT_RECORD, html.code(str(score)))
             )
+            LOGGER.info(Logs.EXAM_TIMEOUT % (user.telegram_id + '@' + user.username))
         cur_task = TASKS.pop(telegram_id)
         cur_task[0].cancel()
         s_msg = await try_send_msg_with_effect(
@@ -91,17 +95,19 @@ async def exam(callback_query: CallbackQuery) -> None:
         await save_msg_id(user.telegram_id, s_msg.message_id, "s")
         return
 
+    user = await get_user_with_session(telegram_id)
+
     if telegram_id not in TASKS:
         await _bot.send_message(
             chat_id=callback_query.message.chat.id,
             text=Messages.SOMETHING_WENT_WRONG,
             reply_markup=Markups.ONLY_DELETE_MARKUP.value
         )
+        LOGGER.warning(Logs.SESSION_BROKEN % (str(user.session.id), user.telegram_id + '@' + user.username))
         return
 
     if (TASKS[telegram_id][1] - datetime.now(UTC)).total_seconds() > 2:
         cur_question, questions_total = await get_cur_question_with_count(telegram_id)
-        user = await get_user_with_session(telegram_id)
 
         if (user.session.progress + 1) % 5 == 0:
             delta = int((TASKS[telegram_id][1] - datetime.now(UTC)).total_seconds())

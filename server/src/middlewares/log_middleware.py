@@ -57,26 +57,26 @@ class LoggingMiddleware(BaseMiddleware):
             LoggingMiddleware.__TIMINGS_LIST = []
 
         telegram_id = "<unknown_id>"
-        msg = f"Unknown event from @anonymous in {te - ts}"
+        msg = f"[{Logs.LOCK}] Unknown event from @anonymous in {te - ts}"
         if isinstance(event, Message):
             username = LoggingMiddleware.collect_username(event, "m")
             telegram_id = event.from_user.id
             if event.text:
                 if "/" in event.text:
-                    msg = f'[%s] Command "{event.text}" from {event.from_user.id}@{username} in {timing}'
+                    msg = f'[%s{Logs.COMMAND}] Command "{event.text}" from {event.from_user.id}@{username} in {timing}'
                 else:
-                    msg = f'[%s] Message "{event.text}" from {event.from_user.id}@{username} in {timing}'
+                    msg = f'[%s{Logs.MESSAGE}] Message "{event.text}" from {event.from_user.id}@{username} in {timing}'
             else:
-                msg = f'[%s] Message "<non_text_data>" from {event.from_user.id}@{username} in {timing}'
+                msg = f'[%s{Logs.MESSAGE}] Message "<non_text_data>" from {event.from_user.id}@{username} in {timing}'
         elif isinstance(event, CallbackQuery):
             username = LoggingMiddleware.collect_username(event, "q")
             telegram_id = event.from_user.id
-            msg = f'[%s] Callback "{event.data}" from {event.from_user.id}@{username} in {timing}'
+            msg = f'[%s{Logs.CALLBACK}] Callback "{event.data}" from {event.from_user.id}@{username} in {timing}'
         elif isinstance(event, PollAnswer):
             username = LoggingMiddleware.collect_username(event, "p")
             telegram_id = event.user.id
             answer = "".join(["абвгдежзиклмн"[i] for i in event.option_ids])
-            msg = f'[%s] Answer "{answer}" from {event.user.id}@{username} in {timing}'
+            msg = f'[%s{Logs.GRAY_TICK}] Answer "{answer}" from {event.user.id}@{username} in {timing}'
 
         user = await get_user(str(telegram_id))
         if not user:
