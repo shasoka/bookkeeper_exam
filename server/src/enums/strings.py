@@ -1,3 +1,6 @@
+"""Module, that stores string constants."""
+
+
 from enum import StrEnum, Enum
 from typing import Final
 
@@ -5,6 +8,7 @@ from aiogram import html
 
 
 class NavButtons(StrEnum):
+    """Enum class with strings for navigation buttons."""
 
     # Simple buttons
     BACK_ARROW: Final[str] = "⬅️"
@@ -13,7 +17,7 @@ class NavButtons(StrEnum):
     FORWARF_TRIANGLE: Final[str] = "▶️"
     FINISH: Final[str] = "🏁"
 
-    # More complicated buttons
+    # Buttons with legend
     BACK_TO_SECTIONS: Final[str] = "◀️ К разделам"
     BACK_TO_THEMES: Final[str] = "◀️ К темам"
     LETS_GO: Final[str] = "▶️ Начать с первого ▶️"
@@ -21,6 +25,7 @@ class NavButtons(StrEnum):
 
 
 class MiscButtons(StrEnum):
+    """Enum class with strings for different not grouped buttons."""
 
     # Button for marking the chosen theme as "done_full"
     MARK_THEME: Final[str] = "🟢 Пометить тему"
@@ -42,6 +47,8 @@ class MiscButtons(StrEnum):
 
 
 class Markers(StrEnum):
+    """Enum class with strings for theme markers."""
+
     GREEN: Final[str] = "🟢"
     YELLOW: Final[str] = "🟡"
     ORANGE: Final[str] = "🟠"
@@ -49,6 +56,7 @@ class Markers(StrEnum):
 
 
 class SlashCommands(StrEnum):
+    """Enum class with strings for commands (like ``/start``)."""
 
     # Command for starting the exam session
     EXAM: Final[str] = "exam"
@@ -64,6 +72,7 @@ class SlashCommands(StrEnum):
 
 
 class Messages(StrEnum):
+    """Enum class with strings for messages, which bot sends to user."""
 
     # Tick
     TICK: Final[str] = "✅"
@@ -117,12 +126,10 @@ class Messages(StrEnum):
                    \n\nТвой наилучший результат: %s{html.code('/35')} 🏆 
                    \n\nНу, что? Готов? {html.spoiler('Хватай клинок 🗡 Будем драться 🤼')} 
                    """
-    THIS_IS_EXAM: Final[str] = html.code("Это экзамен, братуха 🥶")
+    THIS_IS_EXAM: Final[str] = html.code("Это экзамен, братуха 🥶")  # Header for each exam question
 
     # Message after the /start entered
-    ON_START_MESSAGE: Final[
-        str
-    ] = f"""Привет 👋, %s!
+    ON_START_MESSAGE: Final[str] = f"""Привет 👋, %s!
         \nМеня зовут {html.bold('Саймон')} и я ... {html.spoiler(html.italic('косоглазый 👀'))}, но это не помешает мне проверить твои знания по бухучету.
         \n☑️ Я приготовил для тебя {html.code('1061')} {html.bold('тестовое')} задание (у меня {html.bold('нет')} заданий с установкой порядка или соответсивия, а также вставкой слов), которые разбиты на {html.code('31')} тему и {html.code('3')} раздела:
         \n1. {html.bold('Теория бухучета')}\n2. {html.bold('Бухгалтерский (финансовый) учет')}\n3. {html.bold('ФЗ "О бухгалтерсом учете", ПБУ')}
@@ -132,9 +139,8 @@ class Messages(StrEnum):
         \nПогладь меня, пожалуйста, и я пущу тебя к вопросам...\n\n\n🥺👇
         """
 
-    ON_EXAM_END: Final[
-        str
-    ] = f"""
+    # Message after the exam session end
+    ON_EXAM_END: Final[str] = f"""
         Ладно, ладно. Успокойся. Финиш 🏁
         \n%s Правильных ответов: %s{html.code('/35')}
         \n\nКаков бы ни был результат, помни, что ты - легенда 👑
@@ -142,21 +148,21 @@ class Messages(StrEnum):
         """
     EXAM_RECORD: Final[str] = (
         "Так уж и быть, обрадую. Ты побил свой предыдущий рекорд! ✳️"
-    )
+    )  # Part of exam summary message with congratulations
     EXAM_NOT_RECORD: Final[str] = (
         "Даже лучшие порой ошибаются... Но это тоже хороший результат! *️⃣"
-    )
-    TIMES_UP: Final[str] = html.code("[ВРЕМЯ ВЫШЛО]")
+    )  # Neutral part of exam summary message
+    TIMES_UP: Final[str] = html.code("[ВРЕМЯ ВЫШЛО]")  # Header for exam summary message if time's up
 
-    ON_QUIZ_END_FAIL: Final[
-        str
-    ] = f"""
+    # Fail summary message for quiz session end
+    ON_QUIZ_END_FAIL: Final[str] = f"""
         Ты старался, держи чоколадку 🍫
         \nПравильных ответов: %s
         \nЯ запомнил вопросы, в которых ты ошибся. Если хочешь перерешать их, жми на кнопку - 🧩 - внизу ({html.italic('вопросы будут следовать в том порядке, в котором они встречались тебе в тесте')}).
         \nЕсли желаешь вернуться к выбору раздела и темы, пиши /restart ♻️
         """
 
+    # Success summary message for quiz session end
     ON_QUIZ_END_SUCCESS: Final[
         str
     ] = f"""
@@ -166,13 +172,16 @@ class Messages(StrEnum):
         \nЕсли желаешь вернуться к выбору раздела и темы, пиши /restart ♻️
         """
 
+    # Part of incorrect answer message with correct variants
     CORRECT_ANSWER: Final[str] = "\n\n❕ " + html.bold("Правильный ответ:") + " "
 
+    # Poll headers
     SELECT_ONE: Final[str] = "Выбери верный ответ"
     SELECT_MANY: Final[str] = "Выбери верные ответы"
 
 
 class CallbackQueryAnswers(StrEnum):
+    """Enum class with strings for in-chat notifications."""
 
     # Answer which occurs if bot is creating new session and clearing old ones
     SESSION_CREATION_DELAY: Final[str] = "♻️ Чищу сесии | %s"
@@ -186,10 +195,12 @@ class CallbackQueryAnswers(StrEnum):
     EXAM_SESSION_CREATED: Final[str] = "⏳ Время пошло"
     TIMER: Final[str] = "⏳"
 
+    # Answer which occurs if theme marked successfully
     THEME_MARKED: Final[str] = "✅ Тема помечена"
 
 
 class Alerts(StrEnum):
+    """Enum class with strings for alert dialogs."""
 
     # Part of the alert which occurs when hint was requested
     NO_MORE_HINTS = "Дальше сам 😶"
@@ -199,7 +210,9 @@ class Alerts(StrEnum):
 
 
 class Arrays(Enum):
+    """Enum class with lists of miscellaneous strings."""
 
+    # Congratulations on correct answers
     SUCCESS_STATUSES: Final[list[str]] = [
         "Напомню: ты - живая легенда",
         "Будь счастлив, здоров, хорошего дня.",
@@ -221,6 +234,7 @@ class Arrays(Enum):
         "Грандиозный результат",
     ]
 
+    # Trolling on incorrect answers
     FAIL_STATUSES: Final[list[str]] = [
         "Учись салага...",
         "Плаки-плаки)",
@@ -238,6 +252,7 @@ class Arrays(Enum):
         "Это 2 балла в диплом. Железобетонно.",
     ]
 
+    # Success effect ids
     SUCCESS_EFFECT_IDS: Final[list[str]] = [
         "5104841245755180586",  # 🔥
         "5107584321108051014",  # 👍
@@ -245,11 +260,15 @@ class Arrays(Enum):
         "5046509860389126442",  # 🎉
     ]
 
+    # Fail effect ids
     FAIL_EFFECT_IDS: Final[list[str]] = [
         "5104858069142078462",  # 👎
         "5046589136895476101",  # 💩
     ]
 
+    # Changelogs
+    # Were used during the release of functional updates to notify active users about innovations
+    # or bug-fixes
     CHANGELOGS: Final[list[str]] = [
         # 20.06.2024
         f"""{html.code('[UPDATE CHANGELOG 20.06.2024]')}

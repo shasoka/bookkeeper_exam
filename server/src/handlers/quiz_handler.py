@@ -1,3 +1,6 @@
+"""Module for handlers related to default quiz mode."""
+
+
 import asyncio
 import random
 

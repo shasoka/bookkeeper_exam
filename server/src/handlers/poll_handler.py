@@ -1,3 +1,6 @@
+"""Module for handling incoming ``aiogram.types.PollAnswer`` objects."""
+
+
 import random
 
 from aiogram import html

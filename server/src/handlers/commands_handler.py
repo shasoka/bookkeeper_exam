@@ -1,4 +1,5 @@
-from typing import Coroutine, Any
+"""Module for commands handlers."""
+
 
 from aiogram import html
 from aiogram.exceptions import TelegramBadRequest
@@ -6,7 +7,6 @@ from aiogram.types import Message, CallbackQuery
 
 from enums.markups import Markups
 from enums.strings import Messages
-from enums.types import NoneFromCoroutine
 from handlers.buttons_handler import pet_me_button_pressed
 from handlers.exam_handler import exam, TASKS
 from handlers.quiz_handler import quiz
@@ -18,16 +18,13 @@ from services.entities_service import (
 )
 
 
-# noinspection PyTypeChecker
-async def command_start_handler(message: Message) -> NoneFromCoroutine:
+async def command_start_handler(message: Message) -> None:
     """
-    Handler for incoming :code:`/start` command.
+    Handler for incoming ``/start`` command.
 
-    It awaits user's session clearing (if any exists) and sends back new on-start-message::code:`aiogram.Message`
-    with inline keyboard.
+    It awaits user's session clearing (if any exists) and sends back new on-start-message with inline keyboard.
 
     :param message: incoming Telegram message from user
-    :return: :code:`None`
     """
 
     await clear_session(message, message.bot)
@@ -39,16 +36,13 @@ async def command_start_handler(message: Message) -> NoneFromCoroutine:
     )
 
 
-# noinspection PyTypeChecker
-async def command_exam_handler(message: Message) -> Coroutine[Any, Any, None]:
+async def command_exam_handler(message: Message) -> None:
     """
-    Handler for incoming :code:`/exam` command.
+    Handler for incoming ``/exam`` command.
 
-    It awaits user's session clearing (if any exists) and sends back new pre-exam-message::code:`aiogram.Message`
-    with inline keyboard.
+    It awaits user's session clearing (if any exists) and sends back new pre-exam-message with inline keyboard.
 
     :param message: incoming Telegram message from user
-    :return: :code:`None`
     """
 
     await clear_session(message, message.bot)
@@ -62,15 +56,13 @@ async def command_exam_handler(message: Message) -> Coroutine[Any, Any, None]:
     )
 
 
-# noinspection PyTypeChecker
-async def command_restart_handler(message: Message) -> Coroutine[Any, Any, None]:
+async def command_restart_handler(message: Message) -> None:
     """
-    Handler for incoming :code:`/restart` command.
+    Handler for incoming ``/restart`` command.
 
     It awaits user's session clearing (if any exists) and calls back to state, where user can choose section.
 
     :param message: incoming Telegram message from user
-    :return: :code:`None`
     """
 
     # Stop async timer task if any exists
@@ -83,16 +75,15 @@ async def command_restart_handler(message: Message) -> Coroutine[Any, Any, None]
     await pet_me_button_pressed(callback_query=message)
 
 
-# noinspection PyTypeChecker
-async def command_heal_handler(message: Message) -> Coroutine[Any, Any, None]:
+async def command_heal_handler(message: Message) -> None:
     """
-    Handler for incoming :code:`/heal` command.
+    Handler for incoming ``/heal`` command.
 
-    It tries to await user's session clearing (if any exists) and sends back new heal-message::code:`aiogram.Message`
-    with inline keyboard. On successful try the message
+    It tries to restore messages with question and poll based on current session progress.
+
+    If session restoration fails function sends back error message.
 
     :param message: incoming Telegram message from user
-    :return: :code:`None`
     """
 
     try:
@@ -125,10 +116,17 @@ async def command_heal_handler(message: Message) -> Coroutine[Any, Any, None]:
         )
 
 
-# noinspection PyTypeChecker
 async def command_change_hints_policy_handler(
     message: Message,
-) -> Coroutine[Any, Any, None]:
+) -> None:
+    """
+    Handler for incoming ``/change_hints_policy`` command.
+
+    It changes hints policy for current user (switches between On/Off). Status message is sent back.
+
+    :param message: incoming Telegram message from user
+    """
+
     user = await get_user_with_session(str(message.from_user.id))
     user_session = user.session
 

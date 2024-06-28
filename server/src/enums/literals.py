@@ -1,3 +1,6 @@
+"""Module, that stores transliterate dictionary."""
+
+
 TRANSLITERATE_DICT = {
     "А": "A",
     "Б": "B",

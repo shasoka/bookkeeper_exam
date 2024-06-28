@@ -1,3 +1,6 @@
+"""Module for inline buttons handlers."""
+
+
 from aiogram import html
 from aiogram.types import (
     CallbackQuery,
@@ -19,8 +22,13 @@ from services.entities_service import (
 )
 
 
-# noinspection PyTypeChecker
 async def pet_me_button_pressed(callback_query: CallbackQuery | Message) -> None:
+    """
+    Function, that is called on ``aiogram.types.CallbackQuery`` with ``data`` property starting with ``pet``.
+
+    :param callback_query: incoming ``aiogram.types.CallbackQuery`` object
+    """
+
     sections = await get_sections()
 
     if isinstance(callback_query, CallbackQuery):
@@ -40,8 +48,15 @@ async def pet_me_button_pressed(callback_query: CallbackQuery | Message) -> None
         )
 
 
-# noinspection PyTypeChecker
 async def section_button_pressed(callback_query: CallbackQuery) -> None:
+    """
+    Function, that is called on ``aiogram.types.CallbackQuery`` with ``data`` property starting with ``section``.
+
+    Creates markup for navigation between pages with themes in specific section.
+
+    :param callback_query: incoming ``aiogram.types.CallbackQuery`` object
+    """
+
     chosen_section = int(callback_query.data[-1])
     themes = await get_themes_by_section(chosen_section)
     user = await get_user(str(callback_query.from_user.id))
@@ -54,7 +69,8 @@ async def section_button_pressed(callback_query: CallbackQuery) -> None:
     keyboard = InlineKeyboardMarkup(inline_keyboard=[])
     last_page = False
 
-    # Добавление кнопок тем
+    # Adding themes to keyboard
+    # 5 themes per page
     for i, theme in enumerate(themes[start_index:end_index]):
         if theme.id in user.themes_done_full:
             marker = Markers.GREEN
@@ -73,7 +89,7 @@ async def section_button_pressed(callback_query: CallbackQuery) -> None:
             ]
         )
 
-    # Добавление кнопки перехода на следующую страницу
+    # Next page button
     if len(themes) > end_index:
         keyboard.inline_keyboard.append(
             [
@@ -86,7 +102,7 @@ async def section_button_pressed(callback_query: CallbackQuery) -> None:
     else:
         last_page = True
 
-    # Добавление кнопки перехода на предыдущую страницу
+    # Previous page button
     if start_page > 1:
         if last_page:
             keyboard.inline_keyboard.append(
@@ -106,11 +122,11 @@ async def section_button_pressed(callback_query: CallbackQuery) -> None:
                 ),
             )
 
-    # Добавление кнопки возвращения к разделам
+    # Back to sections button
     keyboard.inline_keyboard.append(
         [InlineKeyboardButton(text=NavButtons.BACK_TO_SECTIONS, callback_data="pet")]
     )
-    # Добавление кнопки удаления сообщения
+    # Delete message button
     keyboard.inline_keyboard.append([Buttons.DELETE_BUTTON.value])
 
     await delete_msg_handler(callback_query)
@@ -122,8 +138,13 @@ async def section_button_pressed(callback_query: CallbackQuery) -> None:
     )
 
 
-# noinspection PyTypeChecker
 async def theme_button_pressed(callback_query: CallbackQuery) -> None:
+    """
+    Function, that is called on ``aiogram.types.CallbackQuery`` with ``data`` property starting with ``theme``.
+
+    :param callback_query: incoming ``aiogram.types.CallbackQuery`` object
+    """
+
     chosen_theme_from_callback, chosen_section = callback_query.data.split("_")[1:]
     chosen_theme = await get_theme_by_id(int(chosen_theme_from_callback))
     user = await get_user(str(callback_query.from_user.id))
@@ -143,6 +164,12 @@ async def theme_button_pressed(callback_query: CallbackQuery) -> None:
 
 
 async def mark_theme_as_done(callback_query: CallbackQuery) -> None:
+    """
+    Function, that is called on ``aiogram.types.CallbackQuery`` with ``data`` property starting with ``mark_theme``.
+
+    :param callback_query: incoming ``aiogram.types.CallbackQuery`` object
+    """
+
     theme, section = callback_query.data.split("_")[2:]
 
     await update_themes_progress(str(callback_query.from_user.id), int(theme), True)

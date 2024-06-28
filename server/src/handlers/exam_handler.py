@@ -1,3 +1,6 @@
+"""Module for handlers related to exam mode."""
+
+
 import asyncio
 import random
 from asyncio import Task

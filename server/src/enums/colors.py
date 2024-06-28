@@ -1,7 +1,11 @@
+"""Module, that stores ANSI-color constants."""
+
+
 from enum import StrEnum
 
 
 class Colors(StrEnum):
+    """Enum class with ANSI-color constants."""
 
     WHITE = "\033[97m"
     BLACK = "\033[0;30m"
@@ -30,6 +34,7 @@ class Colors(StrEnum):
     END = "\033[0m"
 
 
+# Dictionary with colors for log-levels
 LOG_LEVLES = {
     "DEBUG": "\033[94m",  # Blue
     "INFO": "\033[92m",  # Green

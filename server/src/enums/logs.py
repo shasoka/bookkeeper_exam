@@ -1,9 +1,14 @@
+"""Module, that stores string constants for logging."""
+
+
 from enum import StrEnum
 from typing import Final
 
 
 class Logs(StrEnum):
+    """Enum class with strings for logging."""
 
+    # Emoji-tags
     LOCK: Final[str] = "🔒"
     UNLOCK: Final[str] = "🔓"
     MESSAGE: Final[str] = "💬"
@@ -11,6 +16,7 @@ class Logs(StrEnum):
     ANSWER: Final[str] = "🔑"
     COMMAND: Final[str] = "🤖"
 
+    # Log messages
     COULDN_DELETE_MSG: Final[str] = "[❌🧹] Couldn't delete msg=%s in chat with user=%s"
 
     AVG_TIMING: Final[str] = "[⏳] Average timing for 25 last requsts: %.5f"
@@ -31,5 +37,6 @@ class Logs(StrEnum):
 
     SESSION_BROKEN: Final[str] = "[🫠] Session=%s was broken by %s"
 
+    # Running modes
     WEBHOOK_MODE: Final[str] = "[🌐] Running in --webhook mode"
     POLLING_MODE: Final[str] = "[🔨] Running in --polling mode"

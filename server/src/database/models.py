@@ -1,3 +1,6 @@
+"""Module for ORM models."""
+
+
 from sqlalchemy import ForeignKey, ARRAY, Integer, String
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, relationship
@@ -5,10 +8,18 @@ from sqlalchemy.orm import mapped_column, Mapped
 
 
 class Base(AsyncAttrs, DeclarativeBase):
-    type_annotation_map = {list[str]: ARRAY(String), list[int]: ARRAY(Integer)}
+    """SQLAlchemy base class."""
+
+    # Annotations
+    type_annotation_map = {
+        list[str]: ARRAY(String),
+        list[int]: ARRAY(Integer)
+    }
 
 
 class Section(Base):
+    """ORM model for ``sections`` table."""
+
     __tablename__ = "sections"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -18,6 +29,8 @@ class Section(Base):
 
 
 class Theme(Base):
+    """ORM model for ``themes`` table."""
+
     __tablename__ = "themes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -33,6 +46,8 @@ class Theme(Base):
 
 
 class Question(Base):
+    """ORM model for ``questions`` table."""
+
     __tablename__ = "questions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -46,6 +61,8 @@ class Question(Base):
 
 
 class User(Base):
+    """ORM model for ``users`` table."""
+
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -67,6 +84,7 @@ class User(Base):
 
 
 class UserSession(Base):
+    """ORM model for ``sessions`` table."""
     __tablename__ = "sessions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
