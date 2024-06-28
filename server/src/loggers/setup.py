@@ -1,3 +1,5 @@
+"""Loggers setup-module."""
+
 import logging
 import os
 import re
@@ -7,7 +9,16 @@ from enums.colors import Colors, LOG_LEVLES
 
 
 class CustomFormatter(logging.Formatter):
-    def format(self, record):
+    """Class extended from ``logging.Formatter``."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        """
+        Overriden function ``formaat`` from parent class.
+
+        :param record: ``logging.LogRecord`` instance
+        :return: formatted string
+        """
+
         lvl_color = LOG_LEVLES.get(record.levelname, Colors.END)
         username_color = Colors.LIGHT_BLUE
         message_color = Colors.WHITE
@@ -26,14 +37,14 @@ class CustomFormatter(logging.Formatter):
 
         lvl_str = "[" + record.levelname + ":" + record.name + "]"
         path_str = (
-                "..."
-                + record.pathname
-                + "/"
-                + record.filename
-                + " in "
-                + record.funcName
-                + ":"
-                + str(record.lineno)
+            "..."
+            + record.pathname
+            + "/"
+            + record.filename
+            + " in "
+            + record.funcName
+            + ":"
+            + str(record.lineno)
         )
 
         msg = msg.replace(lvl_str, f"{lvl_color}{lvl_str}{reset}")
@@ -46,10 +57,12 @@ class CustomFormatter(logging.Formatter):
         return msg
 
 
+# Set basic loggers to warning-level
 logging.getLogger("sqlalchemy").setLevel(logging.WARN)
 logging.getLogger("aiohttp").setLevel(logging.WARN)
 logging.getLogger("aiogram").setLevel(logging.WARN)
 
+# Setup root logger
 LOGGER: logging.Logger = logging.getLogger()
 
 formatter = CustomFormatter(

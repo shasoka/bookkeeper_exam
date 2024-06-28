@@ -1,3 +1,5 @@
+"""Module for logging middleware."""
+
 from time import time
 from typing import Callable, Any, Awaitable
 
@@ -11,16 +13,33 @@ from services.entities_service import get_user
 
 
 class LoggingMiddleware(BaseMiddleware):
+    """Logging middleware-class extended from ``aiogram.BaseMiddleware``."""
+
+    # Events counter
     __AVG_TIME_COUNTER = 0
+
+    # List of timings, resets each 25 requests
+    # Used to calcu;at eaverage timing
     __TIMINGS_LIST = []
 
-    # noinspection PyTypeChecker
     async def __call__(
         self,
         handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
         event: Message | CallbackQuery | PollAnswer,
         data: dict[str, Any],
     ) -> Any:
+        """
+        Overrided function ``__call__`` from parent class.
+
+        Spawns logs for each incoming authorized or not event. Log strings are based on event type.
+
+        Each 25 events this middleware calculates aberage response time.
+
+        :param handler: handler, which will be called after middleware function
+        :param event: incoming event, basically ``aiogram.Message``, ``aiogram.CallbackQuery`` or ``aiogram.PollAnswer``
+        :param data: incoming event data
+        :return: ``Any``
+        """
 
         ts = time()
         await handler(event, data)

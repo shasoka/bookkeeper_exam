@@ -1,10 +1,18 @@
+"""Module for `changelog_seen` middleware."""
+
 import asyncio
 import random
 from typing import Callable, Any, Awaitable
 
 from aiogram import BaseMiddleware, html
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import TelegramObject, LinkPreviewOptions, Message, CallbackQuery, PollAnswer
+from aiogram.types import (
+    TelegramObject,
+    LinkPreviewOptions,
+    Message,
+    CallbackQuery,
+    PollAnswer,
+)
 
 from enums.logs import Logs
 from enums.markups import Markups
@@ -13,14 +21,25 @@ from loggers.setup import LOGGER
 from services.entities_service import get_user, changelog_seen
 
 
-class LastChangelogMiddleware(BaseMiddleware):
-    # noinspection PyTypeChecker
+class ChangelogSeenMiddleware(BaseMiddleware):
+    """``changelog_seen`` middleware-class extended from ``aiogram.BaseMiddleware``."""
+
     async def __call__(
         self,
         handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
+        """
+        Overrided function ``__call__`` from parent class.
+
+        Checks if user seen latest changelog or not.
+
+        :param handler: handler, which will be called after middleware function
+        :param event: incoming event, basically ``aiogram.Message``, ``aiogram.CallbackQuery`` or ``aiogram.PollAnswer``
+        :param data: incoming event data
+        :return: ``Any``
+        """
 
         telegram_id: str = "<unknown_id>"
         if isinstance(event, (Message, CallbackQuery)):
@@ -37,16 +56,17 @@ class LastChangelogMiddleware(BaseMiddleware):
                     disable_notification=False,
                     link_preview_options=LinkPreviewOptions(is_disabled=True),
                     message_effect_id=effect_id,
-                    reply_markup=Markups.ONLY_DELETE_MARKUP.value
+                    reply_markup=Markups.ONLY_DELETE_MARKUP.value,
                 )
             except TelegramBadRequest:
                 await event.answer(
-                    Arrays.CHANGELOGS.value[-1] + Messages.INVALID_EFFECT_ID % html.code(effect_id),
+                    Arrays.CHANGELOGS.value[-1]
+                    + Messages.INVALID_EFFECT_ID % html.code(effect_id),
                     link_preview_options=LinkPreviewOptions(is_disabled=True),
                     disable_notification=False,
-                    reply_markup=Markups.ONLY_DELETE_MARKUP.value
+                    reply_markup=Markups.ONLY_DELETE_MARKUP.value,
                 )
-            LOGGER.info(Logs.CHANGE_LOG_SEEN % (user.telegram_id + '@' + user.username))
+            LOGGER.info(Logs.CHANGE_LOG_SEEN % (user.telegram_id + "@" + user.username))
             await changelog_seen(str(event.from_user.id))
             await asyncio.sleep(5)
 

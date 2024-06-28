@@ -27,7 +27,9 @@ class Theme(Base):
 
     section: Mapped["Section"] = relationship("Section", back_populates="themes")
     session: Mapped["UserSession"] = relationship("UserSession", back_populates="theme")
-    questions: Mapped[list["Question"]] = relationship("Question", back_populates="theme")
+    questions: Mapped[list["Question"]] = relationship(
+        "Question", back_populates="theme"
+    )
 
 
 class Question(Base):

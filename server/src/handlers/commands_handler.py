@@ -6,15 +6,20 @@ from aiogram.types import Message, CallbackQuery
 
 from enums.markups import Markups
 from enums.strings import Messages
-from enums.types import CoroNoneReturn
+from enums.types import NoneFromCoroutine
 from handlers.buttons_handler import pet_me_button_pressed
 from handlers.exam_handler import exam, TASKS
 from handlers.quiz_handler import quiz
-from services.entities_service import clear_session, get_user, get_user_with_session, change_hints_policy
+from services.entities_service import (
+    clear_session,
+    get_user,
+    get_user_with_session,
+    change_hints_policy,
+)
 
 
 # noinspection PyTypeChecker
-async def command_start_handler(message: Message) -> CoroNoneReturn:
+async def command_start_handler(message: Message) -> NoneFromCoroutine:
     """
     Handler for incoming :code:`/start` command.
 
@@ -121,7 +126,9 @@ async def command_heal_handler(message: Message) -> Coroutine[Any, Any, None]:
 
 
 # noinspection PyTypeChecker
-async def command_change_hints_policy_handler(message: Message) -> Coroutine[Any, Any, None]:
+async def command_change_hints_policy_handler(
+    message: Message,
+) -> Coroutine[Any, Any, None]:
     user = await get_user_with_session(str(message.from_user.id))
     user_session = user.session
 
@@ -141,14 +148,14 @@ async def command_change_hints_policy_handler(message: Message) -> Coroutine[Any
                     await message.bot.edit_message_reply_markup(
                         chat_id=int(user.telegram_id),
                         message_id=user_session.cur_q_msg,
-                        reply_markup=Markups.only_hints_markup(user_session)
+                        reply_markup=Markups.only_hints_markup(user_session),
                     )
             else:  # Hints not allowed
                 if user_session.cur_q_msg:
                     await message.bot.edit_message_reply_markup(
                         chat_id=int(user.telegram_id),
                         message_id=user_session.cur_q_msg,
-                        reply_markup=None
+                        reply_markup=None,
                     )
     except (TelegramBadRequest, AttributeError):
         pass

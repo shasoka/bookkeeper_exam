@@ -4,7 +4,6 @@ Module, which loads environment variables from ``.env`` file and stores them in 
 Example ``.env`` file is in the ``server`` folder
 """
 
-
 import os
 
 from typing import Final

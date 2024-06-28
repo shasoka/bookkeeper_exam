@@ -1,5 +1,10 @@
 from aiogram import html
-from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import (
+    CallbackQuery,
+    Message,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
 
 from enums.markups import Markups, Buttons
 from enums.strings import Messages, NavButtons, CallbackQueryAnswers, Markers
@@ -10,7 +15,7 @@ from services.entities_service import (
     get_user,
     get_theme_by_id,
     get_questions_with_len_by_theme,
-    update_themes_progress
+    update_themes_progress,
 )
 
 
@@ -24,14 +29,14 @@ async def pet_me_button_pressed(callback_query: CallbackQuery | Message) -> None
             chat_id=callback_query.message.chat.id,
             text=Messages.SECTIONS_FROM_START,
             reply_markup=Markups.sections_markup(sections),
-            disable_notification=True
+            disable_notification=True,
         )
     else:
         await callback_query.bot.send_message(
             chat_id=callback_query.chat.id,
             text=Messages.SECTIONS_FROM_RESTART,
             reply_markup=Markups.sections_markup(sections),
-            disable_notification=True
+            disable_notification=True,
         )
 
 
@@ -40,7 +45,9 @@ async def section_button_pressed(callback_query: CallbackQuery) -> None:
     chosen_section = int(callback_query.data[-1])
     themes = await get_themes_by_section(chosen_section)
     user = await get_user(str(callback_query.from_user.id))
-    start_page = (1 if callback_query.data.startswith("section") else int(callback_query.data[-3]))
+    start_page = (
+        1 if callback_query.data.startswith("section") else int(callback_query.data[-3])
+    )
     per_page = 5
     start_index = (start_page - 1) * per_page
     end_index = start_page * per_page
@@ -111,7 +118,7 @@ async def section_button_pressed(callback_query: CallbackQuery) -> None:
         chat_id=callback_query.message.chat.id,
         text=Messages.ON_SECTIONS_CHOSEN % (Messages.ONE * chosen_section),
         reply_markup=keyboard,
-        disable_notification=True
+        disable_notification=True,
     )
 
 
@@ -121,14 +128,17 @@ async def theme_button_pressed(callback_query: CallbackQuery) -> None:
     chosen_theme = await get_theme_by_id(int(chosen_theme_from_callback))
     user = await get_user(str(callback_query.from_user.id))
 
-    _, questions_total = await get_questions_with_len_by_theme(int(chosen_theme_from_callback))
+    _, questions_total = await get_questions_with_len_by_theme(
+        int(chosen_theme_from_callback)
+    )
 
     await delete_msg_handler(callback_query)
     await callback_query.message.bot.send_message(
         chat_id=callback_query.message.chat.id,
-        text=Messages.ON_THEME_CHOSEN % (html.italic(chosen_theme.title), html.code(str(questions_total))),
+        text=Messages.ON_THEME_CHOSEN
+        % (html.italic(chosen_theme.title), html.code(str(questions_total))),
         reply_markup=Markups.theme_chosen_markup(chosen_theme, user),
-        disable_notification=True
+        disable_notification=True,
     )
 
 
@@ -141,11 +151,12 @@ async def mark_theme_as_done(callback_query: CallbackQuery) -> None:
     new_markup = callback_query.message.reply_markup
     new_markup.inline_keyboard[2] = [
         InlineKeyboardButton(
-            text=NavButtons.BACK_TO_THEMES + " " + NavButtons.BACK_TRIANGLE, callback_data="section_" + section
+            text=NavButtons.BACK_TO_THEMES + " " + NavButtons.BACK_TRIANGLE,
+            callback_data="section_" + section,
         )
     ]
     await callback_query.message.bot.edit_message_reply_markup(
         chat_id=callback_query.message.chat.id,
         message_id=callback_query.message.message_id,
-        reply_markup=new_markup
+        reply_markup=new_markup,
     )

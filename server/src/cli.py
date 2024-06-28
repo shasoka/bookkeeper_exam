@@ -6,7 +6,6 @@ There are only two options:
     - ``--polling`` for running in polling mode
 """
 
-
 import asyncio
 from concurrent import futures
 
@@ -15,15 +14,21 @@ from aiogram import Bot
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
 
-from config import BASE_WEBHOOK_URL, WEBHOOK_PATH, WEBHOOK_SECRET, WEB_SERVER_HOST, WEB_SERVER_PORT
+from config import (
+    BASE_WEBHOOK_URL,
+    WEBHOOK_PATH,
+    WEBHOOK_SECRET,
+    WEB_SERVER_HOST,
+    WEB_SERVER_PORT,
+)
 from enums.logs import Logs
 from loggers.setup import LOGGER
 from setup import setup
 
 
 @click.command
-@click.option('--webhook', is_flag=True, help="Run the bot in webhook mode")
-@click.option('--polling', is_flag=True, help="Run the bot in polling mode")
+@click.option("--webhook", is_flag=True, help="Run the bot in webhook mode")
+@click.option("--polling", is_flag=True, help="Run the bot in polling mode")
 def main(webhook: bool, polling: bool) -> None:
     """
     Click-decorated function for CLI.
@@ -52,8 +57,7 @@ async def __set_wh(bot: Bot) -> None:
     """
 
     await bot.set_webhook(
-        url=f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}",
-        secret_token=WEBHOOK_SECRET
+        url=f"{BASE_WEBHOOK_URL}{WEBHOOK_PATH}", secret_token=WEBHOOK_SECRET
     )
 
 

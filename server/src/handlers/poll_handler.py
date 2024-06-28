@@ -14,13 +14,30 @@ from services.entities_service import (
     get_cur_question_with_count,
     append_incorrects,
     save_msg_id,
-    increase_progress
+    increase_progress,
 )
-from services.utility_service import parse_answers_from_question, parse_answers_from_poll
+from services.utility_service import (
+    parse_answers_from_question,
+    parse_answers_from_poll,
+)
 
 
-# noinspection PyTypeChecker
-async def on_poll_answer(poll_answer: PollAnswer):
+async def on_poll_answer(poll_answer: PollAnswer) -> None:
+    """
+    Function, which handles poll answers. Poll options are collected from bounded with this poll question and presented
+    as:
+
+    - a
+    - b
+    - c
+    - ...
+
+    Handler checks user chosen ``option_ids`` if they are equal to correct variants and sends back the
+    ``aiogram.tupes.Message`` with congratulations or disappointment.
+
+    :param poll_answer: incoming ``aiogram.types.PollAnswer`` object
+    """
+
     user = await get_user_with_session(str(poll_answer.user.id))
     user_session = user.session
 
@@ -57,27 +74,33 @@ async def on_poll_answer(poll_answer: PollAnswer):
         a_msg = await try_send_msg_with_effect(
             bot=poll_answer.bot,
             chat_id=user.telegram_id,
-            text=Messages.TICK + " " + html.bold(random.choice(Arrays.SUCCESS_STATUSES.value)),
+            text=Messages.TICK
+            + " "
+            + html.bold(random.choice(Arrays.SUCCESS_STATUSES.value)),
             reply_markup=Markups.next_question_markup(
                 next_q=user_session.progress < questions_total - 1,
-                callback_data=callback_data
+                callback_data=callback_data,
             ),
             message_effect_id=random.choice(Arrays.SUCCESS_EFFECT_IDS.value),
         )
-        LOGGER.info(Logs.CORRECT_ANS % (user.telegram_id + '@' + user.username))
+        LOGGER.info(Logs.CORRECT_ANS % (user.telegram_id + "@" + user.username))
     else:
         a_msg = await try_send_msg_with_effect(
             bot=poll_answer.bot,
             chat_id=user.telegram_id,
-            text=Messages.CROSS + " " + html.bold(random.choice(Arrays.FAIL_STATUSES.value)) + Messages.CORRECT_ANSWER + html.italic(correct_answer),
+            text=Messages.CROSS
+            + " "
+            + html.bold(random.choice(Arrays.FAIL_STATUSES.value))
+            + Messages.CORRECT_ANSWER
+            + html.italic(correct_answer),
             reply_markup=Markups.next_question_markup(
                 next_q=user_session.progress < questions_total - 1,
-                callback_data=callback_data
+                callback_data=callback_data,
             ),
             message_effect_id=random.choice(Arrays.FAIL_EFFECT_IDS.value),
         )
         await append_incorrects(str(poll_answer.user.id), cur_question.id)
-        LOGGER.info(Logs.INCORRECT_ANS % (user.telegram_id + '@' + user.username))
+        LOGGER.info(Logs.INCORRECT_ANS % (user.telegram_id + "@" + user.username))
 
     await save_msg_id(str(poll_answer.user.id), a_msg.message_id, "a")
     await increase_progress(str(poll_answer.user.id))

@@ -9,23 +9,19 @@ from enums.strings import MiscButtons, NavButtons
 
 class Buttons(Enum):
     DELETE_BUTTON: Final[InlineKeyboardButton] = InlineKeyboardButton(
-        text=MiscButtons.DELETE,
-        callback_data="delete"
+        text=MiscButtons.DELETE, callback_data="delete"
     )
 
     SOLVE_INCORRECTS: Final[InlineKeyboardButton] = InlineKeyboardButton(
-        text=MiscButtons.PUZZLE,
-        callback_data="quiz_incorrect"
+        text=MiscButtons.PUZZLE, callback_data="quiz_incorrect"
     )
 
     PET_BUTTON: Final[InlineKeyboardButton] = InlineKeyboardButton(
-        text=MiscButtons.PET_ME,
-        callback_data="pet"
+        text=MiscButtons.PET_ME, callback_data="pet"
     )
 
     FIGHT_BUTTON: Final[InlineKeyboardButton] = InlineKeyboardButton(
-        text=MiscButtons.FIGHT_ME,
-        callback_data="exam_init"
+        text=MiscButtons.FIGHT_ME, callback_data="exam_init"
     )
 
 
@@ -33,28 +29,20 @@ class Markups(Enum):
     QUIZ_S_MSG_MARKUP: Final[InlineKeyboardMarkup] = InlineKeyboardMarkup(
         inline_keyboard=[
             [Buttons.SOLVE_INCORRECTS.value],
-            [Buttons.DELETE_BUTTON.value]
+            [Buttons.DELETE_BUTTON.value],
         ]
     )
 
     ONLY_DELETE_MARKUP: Final[InlineKeyboardMarkup] = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [Buttons.DELETE_BUTTON.value]
-        ]
+        inline_keyboard=[[Buttons.DELETE_BUTTON.value]]
     )
 
     PET_ME_MARKUP: Final[InlineKeyboardMarkup] = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [Buttons.PET_BUTTON.value],
-            [Buttons.DELETE_BUTTON.value]
-        ]
+        inline_keyboard=[[Buttons.PET_BUTTON.value], [Buttons.DELETE_BUTTON.value]]
     )
 
     FIGHT_ME_MARKUP: Final[InlineKeyboardMarkup] = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [Buttons.FIGHT_BUTTON.value],
-            [Buttons.DELETE_BUTTON.value]
-        ]
+        inline_keyboard=[[Buttons.FIGHT_BUTTON.value], [Buttons.DELETE_BUTTON.value]]
     )
 
     @staticmethod
@@ -63,7 +51,8 @@ class Markups(Enum):
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text=MiscButtons.HINT + f" ({user_session.hints}/{user_session.hints_total})",
+                        text=MiscButtons.HINT
+                        + f" ({user_session.hints}/{user_session.hints_total})",
                         callback_data="hint",
                     )
                 ]
@@ -112,14 +101,15 @@ class Markups(Enum):
                 (
                     [
                         InlineKeyboardButton(
-                            text=NavButtons.BACK_TO_THEMES, callback_data="section_" + str(theme.id)
+                            text=NavButtons.BACK_TO_THEMES,
+                            callback_data="section_" + str(theme.id),
                         ),
                         InlineKeyboardButton(
                             text=MiscButtons.MARK_THEME,
                             callback_data="mark_theme_"
-                                          + str(theme.id)
-                                          + "_"
-                                          + str(theme.section_id),
+                            + str(theme.id)
+                            + "_"
+                            + str(theme.section_id),
                         ),
                     ]
                     if theme.id not in user.themes_done_full
@@ -141,9 +131,7 @@ class Markups(Enum):
                 [
                     InlineKeyboardButton(
                         text=(
-                            NavButtons.FORWARD_ARROW
-                            if next_q
-                            else NavButtons.FINISH
+                            NavButtons.FORWARD_ARROW if next_q else NavButtons.FINISH
                         ),
                         callback_data=callback_data,
                     )

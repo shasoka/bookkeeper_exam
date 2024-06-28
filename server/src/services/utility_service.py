@@ -1,6 +1,5 @@
 """Module for utility functions."""
 
-
 from aiogram import html
 
 from enums.literals import TRANSLITERATE_DICT
