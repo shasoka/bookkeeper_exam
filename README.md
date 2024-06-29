@@ -16,9 +16,9 @@
 
 ## Примеры работы
 
-Предлагаю вам посмотреть на меня в **_деле_**!
+Предлагаю вам посмотреть на меня в **_деле_**! [Кликай!](https://youtu.be/DJ0eLfxAC94?si=uhO5ksbtv60hmVyR) 👈
 
-[![Video example](https://raw.githubusercontent.com/shasoka/bookkeeper_exam/main/readme_images/placeholder.png)](https://raw.githubusercontent.com/shasoka/bookkeeper_exam/main/readme_images/preview.mp4)
+> 🚂 Ссылка ведет на **_YouTube_**.
 
 ## Реализация
 
@@ -26,7 +26,7 @@
 
 🗄 Ниже приведена структура файлов и директорий проекта: 
 
-```shell
+```
 \---bookkeeper_exam
     |   .gitignore
     |   LICENSE
@@ -139,23 +139,23 @@
 3. Получите токен доступа. Он должен выглядеть примерно так: `1234567890:aBCDeFghIjKLmnoPQRSTUvwXYzAbcDefGHi`.
 4. Клонируйте этот репозиторий с помощью `git clone`.
 5. Находясь в папке `server` создайте виртуальное окружение и установите зависимости:
-    ```shell
+    ```console
     python -m venv venv
     .\venv\Scripts\activate
     pip install -r .\requirements.txt
     ```
 6. Создайте и заполните БД:
-    ```shell
+    ```console
     psql -U postgres -f .\migrations\createdb.sql -f .\migrations\questions.sql -f .\migrations\sections.sql -f .\migrations\sessions.sql -f .\migrations\themes.sql
     ```
     > ⚠️ Обратите внимание на то, что в `58` строке файла `createdb.sql` необходимо указать ваш `TelegramID`:
-    > ```postgresql
+    > ```sql
     > INSERT INTO users (telegram_id) VALUES ('<ВАШ_TG_ID>');
     > ```
     > Получить свой идентификатор можно у **_[этого бота](https://t.me/useridinfobot)_**.
 7. Создайте файл окружения `.env` и заполните его по примеру файла `example.env`.
 8. Запустите бота командой:
-    ```shell
+    ```console
     python .\src\main.py --polling
     ```
 9. Победа! ✅
