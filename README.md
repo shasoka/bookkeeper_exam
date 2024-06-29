@@ -16,7 +16,9 @@
 
 ## Примеры работы
 
-_Здесь будет **нечто**!_
+Предлагаю вам посмотреть на меня в **_деле_**!
+
+[![Video example](https://raw.githubusercontent.com/shasoka/bookkeeper_exam/main/readme_images/placeholder.png)](https://raw.githubusercontent.com/shasoka/bookkeeper_exam/main/readme_images/preview.mp4)
 
 ## Реализация
 
@@ -116,7 +118,7 @@ _Здесь будет **нечто**!_
 
 И ~~великолепные~~ логи:
 
-![Deploy logs]()
+![Deploy logs](readme_images/logs.png)
 
 ## Развертывание
 
