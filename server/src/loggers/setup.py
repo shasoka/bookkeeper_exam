@@ -28,7 +28,7 @@ class CustomFormatter(logging.Formatter):
         if "src" not in (parts := record.pathname.split(os.sep)):
             record.pathname = "venv"
         else:
-            src_dir_id = parts.index("src")
+            src_dir_id = parts.index("src", -1)
             record.pathname = "/".join(parts[src_dir_id:-1])
         if record.funcName == "<module>":
             record.funcName = "root"

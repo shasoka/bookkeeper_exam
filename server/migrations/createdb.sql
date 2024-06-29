@@ -1,6 +1,6 @@
 -- DROP DATABASE accounting_questions;
---
--- CREATE DATABASE accounting_questions;
+
+CREATE DATABASE accounting_questions;
 
 CREATE TABLE sections (
     id SERIAL PRIMARY KEY,
@@ -55,14 +55,4 @@ CREATE TABLE sessions (
     FOREIGN KEY (theme_id) REFERENCES themes(id)
 );
 
-INSERT INTO users (telegram_id) VALUES ('401791628'),
-                                       ('760058245'),
-                                       ('768653895'),
-                                       ('1005587901'),
-                                       ('5258574541'),
-                                       ('620396347'),
-                                       ('1098632718'),
-                                       ('5428878153'),
-                                       ('1043969446'),
-                                       ('518027491'),
-                                       ('701161572');
+INSERT INTO users (telegram_id) VALUES ('');
